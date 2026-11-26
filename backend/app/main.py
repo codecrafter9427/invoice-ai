@@ -14,11 +14,12 @@ settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.2.0-m2",
+    version="0.3.0-m3",
     description=(
         "Supplier invoice capture, review, approval, and payables visibility. "
-        "Milestone 2: supplier/invoice CRUD, deterministic totals, duplicates, "
-        "approval workflow, payment recording. OCR and Anomaly Radar UI are later."
+        "Milestone 3: DemoAIProvider extract/category/anomaly explain, "
+        "Invoice Anomaly Radar (rules-first, never fraud), document metadata. "
+        "Totals remain deterministic code. No paid OCR/LLM required."
     ),
 )
 

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "invoice-ai"
-    version: str = "0.2.0-m2"
+    version: str = "0.3.0-m3"
 
 
 class ComingSoonResponse(BaseModel):

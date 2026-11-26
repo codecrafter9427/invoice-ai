@@ -6,7 +6,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, require_roles
@@ -197,6 +197,7 @@ def list_invoices(
     page_size: int = Query(50, ge=1, le=100),
     status: str | None = None,
     search: str | None = None,
+    has_anomaly: bool | None = None,
 ) -> InvoiceListResponse:
     filters = [
         Invoice.organization_id == user.organization_id,
@@ -214,6 +215,16 @@ def list_invoices(
     if search:
         like = f"%{search.strip()}%"
         filters.append(Invoice.invoice_number.ilike(like))
+    if has_anomaly is True:
+        filters.append(
+            or_(
+                Invoice.has_anomaly_signal.is_(True),
+                Invoice.has_duplicate_warning.is_(True),
+            )
+        )
+    elif has_anomaly is False:
+        filters.append(Invoice.has_anomaly_signal.is_(False))
+        filters.append(Invoice.has_duplicate_warning.is_(False))
 
     total = db.scalar(select(func.count()).select_from(Invoice).where(*filters)) or 0
     rows = db.scalars(

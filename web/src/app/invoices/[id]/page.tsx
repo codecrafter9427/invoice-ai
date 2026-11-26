@@ -8,6 +8,8 @@ import { AppShell } from "@/components/AppShell";
 import {
   apiFetch,
   ApiError,
+  type AIResponse,
+  type AnomalySignal,
   type InvoiceDetail,
   type Payment,
 } from "@/lib/api";
@@ -22,6 +24,10 @@ export default function InvoiceDetailPage() {
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("ach");
   const [payRef, setPayRef] = useState("");
+  const [radarSignals, setRadarSignals] = useState<AnomalySignal[]>([]);
+  const [radarExplanation, setRadarExplanation] = useState<string | null>(null);
+  const [categoryNote, setCategoryNote] = useState<string | null>(null);
+  const [categoryConfirmed, setCategoryConfirmed] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -34,9 +40,49 @@ export default function InvoiceDetailPage() {
     }
   }, [id]);
 
+  const loadAssist = useCallback(async () => {
+    try {
+      const radar = await apiFetch<AIResponse>("/api/v1/ai/invoice-anomalies", {
+        method: "POST",
+        body: JSON.stringify({
+          input: { invoice_id: id },
+          context_ids: [id],
+          options: {},
+        }),
+      });
+      setRadarSignals((radar.result.signals as AnomalySignal[]) || []);
+      setRadarExplanation(radar.explanation);
+
+      const cat = await apiFetch<AIResponse>("/api/v1/ai/category-suggestion", {
+        method: "POST",
+        body: JSON.stringify({
+          input: { invoice_id: id },
+          context_ids: [id],
+          options: {},
+        }),
+      });
+      const suggested = cat.result.suggested_category as
+        | { code?: string; name?: string }
+        | null
+        | undefined;
+      setCategoryNote(
+        suggested
+          ? `Suggested: ${suggested.code} — ${suggested.name}. ${cat.explanation}`
+          : cat.explanation
+      );
+      setCategoryConfirmed(false);
+    } catch {
+      // Assist panels are optional; invoice detail still works
+    }
+  }, [id]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void loadAssist();
+  }, [loadAssist]);
 
   async function workflow(action: "submit_review" | "submit_approval") {
     setBusy(true);
@@ -155,6 +201,69 @@ export default function InvoiceDetailPage() {
                   ))}
                 </ul>
               </div>
+            )}
+
+            <section className="space-y-3 rounded-lg border border-slate/15 bg-white/80 p-4">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="font-medium text-ink">Anomaly Radar</h2>
+                <Link
+                  href="/anomaly-radar"
+                  className="text-xs text-accent hover:underline"
+                >
+                  Open radar
+                </Link>
+              </div>
+              <p className="text-xs text-slate">
+                Rules-first review hints. Never a fraud verdict.
+              </p>
+              {radarExplanation && (
+                <p className="text-sm text-slate">{radarExplanation}</p>
+              )}
+              {radarSignals.length === 0 ? (
+                <p className="text-sm text-slate">No radar signals for this invoice.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {radarSignals.map((s) => (
+                    <li
+                      key={s.code + s.message}
+                      className="rounded-md border border-slate/10 bg-mist/40 px-3 py-2 text-sm"
+                    >
+                      <span className="font-medium text-ink">{s.code}</span>
+                      <span className="ml-2 text-xs text-accent">
+                        not fraud
+                      </span>
+                      <p className="mt-1 text-slate">{s.message}</p>
+                      {s.explanation && (
+                        <p className="mt-1 text-xs text-slate">{s.explanation}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            {categoryNote && (
+              <section className="space-y-2 rounded-lg border border-slate/15 bg-white/80 p-4">
+                <h2 className="font-medium text-ink">Category suggestion</h2>
+                <p className="text-sm text-slate">{categoryNote}</p>
+                <label className="flex items-start gap-2 text-sm text-ink">
+                  <input
+                    type="checkbox"
+                    checked={categoryConfirmed}
+                    onChange={(e) => setCategoryConfirmed(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span>
+                    I confirm this category (required before treating it as
+                    saved — AI does not write the category automatically).
+                  </span>
+                </label>
+                {categoryConfirmed && (
+                  <p className="text-xs text-accent">
+                    Confirmation recorded locally for this session.
+                  </p>
+                )}
+              </section>
             )}
 
             <section className="grid gap-4 rounded-lg border border-slate/15 bg-white/80 p-4 sm:grid-cols-3">

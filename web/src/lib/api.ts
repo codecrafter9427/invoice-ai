@@ -135,4 +135,47 @@ export type Payment = {
   invoice_amount_paid?: string | null;
 };
 
+export type AISource = { type: string; id: string; label: string };
+
+export type AIResponse = {
+  result: Record<string, unknown>;
+  explanation: string;
+  sources: AISource[];
+  requires_confirmation: boolean;
+};
+
+export type AnomalySignal = {
+  code: string;
+  severity: string;
+  message: string;
+  explanation?: string;
+  evidence?: Record<string, unknown>;
+  is_fraud_verdict: boolean;
+};
+
+export type ExtractResult = {
+  header?: Record<string, string>;
+  line_items?: Array<{
+    description: string;
+    quantity: string;
+    unit_price: string;
+    tax_rate: string;
+    confidence?: number;
+  }>;
+  field_confidence?: Record<string, number>;
+  ocr_verified?: boolean;
+  requires_user_review?: boolean;
+  validation_issues?: string[];
+  validation_explanations?: Array<{ code: string; explanation: string }>;
+  po_candidates?: Array<{
+    id: string;
+    po_number: string;
+    score: number;
+    match_type?: string;
+    note?: string;
+  }>;
+  provider?: string;
+  note?: string;
+};
+
 export { API_BASE };

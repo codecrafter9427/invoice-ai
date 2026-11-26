@@ -1,4 +1,4 @@
-"""AIProvider interface — typed stubs for Invoice AI features."""
+"""AIProvider interface — swappable backends for Invoice AI."""
 
 from abc import ABC, abstractmethod
 
@@ -11,7 +11,7 @@ class AIProvider(ABC):
 
     @abstractmethod
     async def invoice_extract(self, request: AIRequest) -> AIResponse:
-        """Extract header/line items from OCR text — stub only; no real OCR."""
+        """Extract header/line items from text/OCR text with field confidence."""
         ...
 
     @abstractmethod

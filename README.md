@@ -2,14 +2,14 @@
 
 Supplier invoice capture, extraction review, approval, payment tracking, and payable visibility for small businesses.
 
-**Milestone 2 complete:** supplier/invoice CRUD with line items, deterministic totals, duplicate flags, review → approval workflow (role-checked + audited), payment recording with balance updates, web UI, and API tests. OCR extraction, Anomaly Radar UI, and Flutter capture are deferred.
+**Milestone 3 complete:** DemoAIProvider extract / category / anomaly explain, Invoice Anomaly Radar (rules-first, never fraud), extract-assist + radar web UI, document metadata registration, and AI API tests. Flutter capture remains optional (M4).
 
 ## Purpose
 
-- Capture supplier invoices (manual entry now; camera/OCR later) and review fields
+- Capture supplier invoices (manual entry + text/OCR extract assist) and review fields
 - Validate totals, duplicates, and dates with deterministic calculations
 - Route invoices through review → approval → payment tracking
-- Surface **Invoice Anomaly Radar** (differentiator) in M3: transparent review signals — never fraud verdicts
+- Surface **Invoice Anomaly Radar**: transparent review signals — never fraud verdicts
 - Demo locally with free tooling only (no paid APIs or OCR services)
 
 ## Stack
@@ -20,7 +20,7 @@ Supplier invoice capture, extraction review, approval, payment tracking, and pay
 | Backend | FastAPI + Pydantic + SQLAlchemy + Alembic |
 | Database | PostgreSQL (UUID PKs, `Numeric` monetary decimals) |
 | Mobile | Flutter (shell; run optional) |
-| AI | `AIProvider` + `DemoAIProvider` stubs; optional Ollama later |
+| AI | `AIProvider` + `DemoAIProvider` (default); optional Ollama adapter |
 | Auth | Demo JWT login, org-scoped authorization |
 
 ## Project layout
@@ -32,10 +32,10 @@ products/invoice-ai/
   .env.example
   docker-compose.yml          # Postgres on host port 5436
   backend/
-    app/                      # FastAPI app, services, APIs
+    app/                      # FastAPI app, services, APIs, ai/
     alembic/                  # Migrations
     scripts/seed.py           # Demo seed
-    tests/                    # Health, auth/tenant, M2 workflow tests
+    tests/                    # Health, auth/tenant, M2 workflow, M3 AI tests
   web/                        # Next.js payables UI
   mobile/                     # Flutter shell
 ```
@@ -46,6 +46,7 @@ products/invoice-ai/
 - Python 3.11+
 - Node.js 20+
 - Flutter SDK (optional)
+- Ollama (optional — not required)
 
 ## Setup
 
@@ -115,7 +116,7 @@ Password for all accounts: **`demo`**
 | `staff@invoiceai.local` | Staff |
 | `other@otherco.local` | Admin of isolation org (tenant tests) |
 
-Seed includes: **10 suppliers**, **25 invoices** with line items, duplicate + anomaly flag examples, and unpaid / partial / paid states (fictional data only).
+Seed includes: **10 suppliers**, **25 invoices** with line items, duplicate + anomaly flag examples, sample OCR text on a few documents, and unpaid / partial / paid states (fictional data only).
 
 ## Tests
 
@@ -124,37 +125,42 @@ cd backend
 pytest -q
 ```
 
-Covers `/health`, demo login, tenant isolation, deterministic totals, duplicate flags, role-checked approvals, and partial/full payments.
+Covers `/health`, demo login, tenant isolation, deterministic totals, duplicate flags, role-checked approvals, payments, **demo extract**, **Anomaly Radar (never fraud)**, category confirmation, and AI auth.
 
-## AI setup
+## AI setup (no Ollama required)
 
-1. Default: `AI_PROVIDER=demo` — deterministic stubs, no network.
-2. Optional local Ollama later (M3): `AI_PROVIDER=ollama`, free open model only.
-3. No paid LLM or OCR APIs.
+Default is fully local and offline:
 
-## Demo steps (M2)
+1. Keep `AI_PROVIDER=demo` in `.env` (this is the default).
+2. Start the API — extract, category suggestion, and Anomaly Radar work with deterministic heuristics/rules.
+3. No network calls, no paid LLM, no paid OCR.
+
+Optional local Ollama (not needed for demos or tests):
+
+1. Install [Ollama](https://ollama.com) and pull a free open model (e.g. `llama3.2`).
+2. Set `AI_PROVIDER=ollama`, `OLLAMA_BASE_URL=http://localhost:11434`, `OLLAMA_MODEL=llama3.2`.
+3. If Ollama is down, the adapter falls back to `DemoAIProvider`.
+4. Structured extract + anomaly **rules** stay deterministic; Ollama may only enrich explanations. Totals are never computed by AI.
+
+## Demo steps (M3)
 
 1. `docker compose up -d` → `alembic upgrade head` → `python -m scripts.seed`
-2. Start API: `uvicorn app.main:app --reload --port 8004` — confirm `GET /health`
+2. Start API: `uvicorn app.main:app --reload --port 8004` — confirm `GET /health` → `0.3.0-m3`
 3. Start web: `cd web && npm run dev` → `http://localhost:3004`
 4. Log in as `staff@invoiceai.local` / `demo`
-5. **Suppliers:** open Suppliers (admin can add via `demo@invoiceai.local`)
-6. **Create invoice:** Invoices → New invoice → pick supplier, add lines, create (totals auto-calc)
-7. **Duplicate check:** create a second invoice with the same supplier + invoice number → see duplicate flag on detail
-8. **Workflow:** on invoice detail → Submit for review → as `reviewer@…` Submit for approval
-9. **Approve:** as `approver@…` open Approvals (or invoice detail) → Approve
-10. **Pay:** record a partial payment, confirm status `partially_paid` and reduced balance; pay remainder → `paid`
-11. Confirm tenant isolation: `other@otherco.local` cannot open Acme invoice IDs
+5. **Extract assist:** open Extract assist → Run extract on the sample text → confirm OCR unverified + field confidence → check “I reviewed”
+6. **Anomaly Radar:** open Anomaly Radar → select `INV-ANOM-TAX-01` / `INV-ANOM-AMT-02` / `INV-ANOM-PAY-03` → see rules-first signals labeled **not fraud**
+7. **Invoice detail:** open a flagged invoice → Anomaly Radar panel + category suggestion (confirm checkbox)
+8. **M2 regression:** create invoice → duplicate flag → review → approve → partial pay (totals still from code)
 
-API-only path (same flow): OpenAPI at `/docs` or:
+API-only AI path:
 
 ```bash
-# login → create invoice → workflow → approvals → payments
 POST /api/v1/auth/demo-login
-POST /api/v1/invoices
-POST /api/v1/invoices/{id}/workflow  {"action":"submit_review"|"submit_approval"}
-POST /api/v1/approvals?invoice_id=…  {"decision":"approved"|"rejected","comment":"…"}
-POST /api/v1/payments                {"invoice_id","amount","payment_date","method"}
+POST /api/v1/ai/invoice-extract     {"input":{"text":"…"}}
+POST /api/v1/ai/invoice-anomalies   {"input":{"invoice_id":"…"}}
+POST /api/v1/ai/category-suggestion {"input":{"description":"Hosting plan"}}
+POST /api/v1/documents              {"invoice_id","filename","storage_path",…}
 ```
 
 ## Milestones / backlog
@@ -163,16 +169,17 @@ POST /api/v1/payments                {"invoice_id","amount","payment_date","meth
 |-----------|--------|--------|
 | **M1** | Env, Docker Postgres, models, Alembic, demo JWT + roles, org scoping, seed, `/health`, auth/tenant tests | **Done** |
 | **M2** | Supplier/invoice CRUD, totals/duplicates/dates, workflow, approvals + audit, payments + balance, web UI, API tests | **Done** |
-| **M3** | AIProvider extract/category/anomaly explain; Invoice Anomaly Radar UI; document metadata upload | Backlog |
+| **M3** | AIProvider extract/category/anomaly explain; Invoice Anomaly Radar UI; document metadata upload | **Done** |
 | **M4** | Flutter capture/OCR path, offline drafts, reports + CSV, E2E polish | Backlog |
 
-## Known limitations (M2)
+## Known limitations (M3)
 
 - Prototype JWT auth only — not production security
-- No OCR extraction or document processing
-- Anomaly Radar UI not productized (seed flags only)
+- Extract is heuristic over pasted/OCR text (no SaaS OCR); user must review
+- Anomaly Radar never auto-blocks payment; signals are advisory
+- Category suggestion is not accounting/tax advice; confirm before save
 - Standalone `/invoice-lines` remains a stub (lines nest under invoices)
-- Reports / aging / CSV export deferred
-- Mobile camera/offline not required for M2
+- Reports / aging / CSV export deferred to M4
+- Mobile camera/offline not required for M3
 
 See [MVP_SPEC.md](./MVP_SPEC.md) for entities, API groups, and acceptance criteria.

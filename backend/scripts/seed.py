@@ -444,6 +444,26 @@ def seed() -> None:
                     )
                 )
 
+            # Sample OCR text for extract demos (unverified until user review)
+            sample_ocr = None
+            if bp["number"] in ("INV-2026-1000", "INV-ANOM-TAX-01", "INV-ANOM-PAY-03"):
+                line0 = bp["lines"][0]
+                sample_ocr = (
+                    f"Supplier: {suppliers[bp['supplier_idx']].name}\n"
+                    f"Invoice Number: {bp['number']}\n"
+                    f"Invoice Date: {inv_date.isoformat()}\n"
+                    f"Due Date: {due.isoformat()}\n"
+                    f"PO: {bp.get('po') or 'PO-2026-0101'}\n"
+                    f"Description: {line0[0]}\n"
+                    f"{line0[0]} x {line0[1]} @ ${line0[2]} tax {float(line0[3])*100:.0f}%\n"
+                    f"Subtotal: ${subtotal}\n"
+                    f"Tax: ${tax_total}\n"
+                    f"Total: ${total}\n"
+                    f"Currency: USD\n"
+                )
+                if bp["number"] == "INV-ANOM-PAY-03":
+                    sample_ocr += "Remit to: ACH *0000 NEW ACCOUNT\n"
+
             db.add(
                 InvoiceDocument(
                     organization_id=demo_org.id,
@@ -452,7 +472,7 @@ def seed() -> None:
                     content_type="application/pdf",
                     storage_path=f"demo/{demo_org.slug}/{bp['number']}.pdf",
                     byte_size=12_345,
-                    ocr_text=None,  # OCR deferred — AI stubs only in M1
+                    ocr_text=sample_ocr,
                 )
             )
 

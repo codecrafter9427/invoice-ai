@@ -1,6 +1,6 @@
 # Invoice AI — MVP Specification
 
-Portfolio MVP for Product 4 (Invoice AI). **Milestone 2** delivers supplier/invoice CRUD, deterministic totals, duplicate flags, approval workflow, payment recording, web UI, and API tests. OCR, Anomaly Radar UI, and Flutter capture remain later milestones.
+Portfolio MVP for Product 4 (Invoice AI). **Milestone 3** delivers AIProvider extract/category/anomaly explain, Invoice Anomaly Radar UI, document metadata registration, and AI API tests. Flutter capture remains M4.
 
 ## Purpose
 
@@ -26,13 +26,13 @@ Every business record is organization-scoped. Endpoints enforce tenant authoriza
 | Supplier | Vendor directory — **CRUD (M2)** |
 | Invoice | Header + workflow status — **CRUD + workflow (M2)** |
 | InvoiceLine | Nested on invoice create/update; deterministic line totals |
-| InvoiceDocument | Uploaded PDF/image metadata (no paid OCR) |
+| InvoiceDocument | Metadata register + optional pasted OCR text (**M3**) |
 | InvoiceReview | Validation notes / flags (seed; full UX later) |
 | ApprovalStep | Approve/reject with comments — **API (M2)** |
 | Payment | Date, amount, method/reference; updates balance — **API (M2)** |
-| PurchaseOrderReference | Candidate PO match only |
-| AccountingCategory | Suggested category; user confirms |
-| AuditEvent | Seed + create/update/approve/pay mutations |
+| PurchaseOrderReference | Candidate PO match only (**M3** extract assist) |
+| AccountingCategory | Suggested category; user confirms (**M3**) |
+| AuditEvent | Seed + create/update/approve/pay/document mutations |
 
 ### Invoice statuses
 
@@ -42,38 +42,44 @@ M2 workflow actions: `submit_review`, `submit_approval`, approve/reject, record 
 
 ## API groups (`/api/v1`)
 
-| Group | M2 status |
-|-------|-----------|
+| Group | Status |
+|-------|--------|
 | `/auth` | Demo JWT login + `/me` |
-| `/suppliers` | **Full CRUD** (archive on DELETE); admin for mutations |
-| `/invoices` | **CRUD** + nested lines + `POST /{id}/workflow` |
+| `/suppliers` | Full CRUD (archive on DELETE); admin for mutations |
+| `/invoices` | CRUD + nested lines + workflow; `has_anomaly` list filter |
 | `/invoice-lines` | Nested via invoices; standalone stub |
-| `/documents` | Coming Soon stub |
+| `/documents` | **M3** metadata register/list/get (no OCR SaaS) |
 | `/invoice-reviews` | Coming Soon stub |
-| `/approvals` | **POST decide** (role-checked) + pending list |
-| `/payments` | **POST record** updates `amount_paid` / `balance_due` / status |
+| `/approvals` | POST decide (role-checked) + pending list |
+| `/payments` | POST record updates `amount_paid` / `balance_due` / status |
 | `/reports/payables` | Coming Soon stub |
-| `/ai/*` | Stub via AIProvider (no real OCR) |
+| `/ai/invoice-extract` | **M3** text→JSON + confidence; OCR unverified until review |
+| `/ai/invoice-anomalies` | **M3** Anomaly Radar (rules-first; never fraud) |
+| `/ai/category-suggestion` | **M3** suggestion; `requires_confirmation=true` |
 
-Health (outside prefix): `GET /health`
+Health (outside prefix): `GET /health` → version `0.3.0-m3`
 
 Shared conventions: REST JSON, UUID PKs, UTC timestamps, decimal monetary values, error shape `{error:{code,message,details}}`.
+
+AI baseline: `{input, context_ids, options}` → `{result, explanation, sources, requires_confirmation}`.
 
 ## Acceptance criteria
 
 | # | Criterion | Status |
 |---|-----------|--------|
-| 1 | Capture creates draft invoice | **M2 done** (manual create → uploaded / needs_review) |
-| 2 | OCR unverified until user review | Stub / M3–M4 |
-| 3 | Duplicate supplier + invoice number flagged | **M2 done** (`has_duplicate_warning`) |
-| 4 | Totals deterministic (code, not AI) | **M2 done** (`app.services.totals`) |
-| 5 | Approvals role-checked and audited | **M2 done** |
-| 6 | Partial/full payments update balance | **M2 done** |
-| 7 | Anomaly is review signal, not fraud | Seed flags; Radar UI **M3** |
+| 1 | Capture creates draft invoice | **Done** (M2) |
+| 2 | OCR unverified until user review | **Done** (M3 extract `ocr_verified=false`) |
+| 3 | Duplicate supplier + invoice number flagged | **Done** (M2 + radar `duplicate_like`) |
+| 4 | Totals deterministic (code, not AI) | **Done** (`app.services.totals`) |
+| 5 | Approvals role-checked and audited | **Done** |
+| 6 | Partial/full payments update balance | **Done** |
+| 7 | Anomaly is review signal, not fraud | **Done** (Radar; `is_fraud_verdict=false`) |
 | 8 | Local setup: Docker Postgres + health + demo login | **Done** |
-| 9 | No paid APIs / OCR services required | **Met** |
+| 9 | No paid APIs / OCR services required | **Met** (`AI_PROVIDER=demo`) |
 | 10 | Seed 10 suppliers / 25 invoices + multi-role + tenant tests | **Done** |
-| 11 | Web UI list/create/review/approve/pay | **M2 done** |
+| 11 | Web UI list/create/review/approve/pay | **Done** (M2) |
+| 12 | Extract assist + Anomaly Radar UI | **Done** (M3) |
+| 13 | Category suggestion requires user confirm | **Done** (M3) |
 
 ## Seed
 
@@ -81,6 +87,7 @@ Shared conventions: REST JSON, UUID PKs, UTC timestamps, decimal monetary values
 - Users: admin, reviewer, approver, staff (+ other-org admin); password `demo`
 - 10 suppliers, 25 invoices with lines, documents, reviews/approvals/payments as relevant
 - Duplicate pair `INV-DUP-5500`; anomaly examples (tax discrepancy, unusual amount, payment-details note)
+- Sample OCR text on `INV-2026-1000`, `INV-ANOM-TAX-01`, `INV-ANOM-PAY-03`
 - Varied statuses including unpaid, partially paid, paid
 
 ## Backlog by milestone
@@ -93,12 +100,14 @@ Shared conventions: REST JSON, UUID PKs, UTC timestamps, decimal monetary values
 - Role-checked approve/reject with audit
 - Web UI + API tests
 
-### M3 — AI + differentiator
+### M3 — AI + differentiator — **Done**
 
 - Wire DemoAIProvider (+ optional Ollama) for extract / category / anomaly **explain**
 - Invoice Anomaly Radar UI: rules-first signals; never fraud verdict
 - Category suggestion requires user confirm
 - Document metadata upload path (no OCR SaaS)
+- PO match returned as **candidate only**
+- Validation issue explanations on extract
 
 ### M4 — Polish
 
@@ -107,6 +116,17 @@ Shared conventions: REST JSON, UUID PKs, UTC timestamps, decimal monetary values
 - Full approval UX polish, aging/spend reports, CSV export
 - E2E demo script; lint/type gates
 
-## Out of scope for Milestone 2
+## Anomaly Radar rules (M3)
 
-Do **not** implement OCR extraction pipelines, Anomaly Radar product UI, or Flutter mobile run requirements in M2.
+| Code | Rule (deterministic) |
+|------|----------------------|
+| `total_tax_discrepancy` | `money(subtotal + tax) != money(total)` or line sum ≠ total |
+| `duplicate_like` | Same org supplier + invoice number (or seed flag) |
+| `unusual_amount` | Total ≥ 3× peer average and gap ≥ 500 |
+| `changed_payment_details` | Stated remittance ≠ supplier directory `payment_details` |
+
+AI may explain why a rule fired. **Never** sets `is_fraud_verdict=true` or returns a fraud verdict.
+
+## Out of scope for Milestone 3
+
+Do **not** require Ollama, paid OCR/LLM, Flutter mobile run, or full reports/CSV in M3.
