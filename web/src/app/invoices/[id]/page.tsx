@@ -27,7 +27,9 @@ export default function InvoiceDetailPage() {
   const [radarSignals, setRadarSignals] = useState<AnomalySignal[]>([]);
   const [radarExplanation, setRadarExplanation] = useState<string | null>(null);
   const [categoryNote, setCategoryNote] = useState<string | null>(null);
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [categoryConfirmed, setCategoryConfirmed] = useState(false);
+  const [categorySaved, setCategorySaved] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -62,19 +64,45 @@ export default function InvoiceDetailPage() {
         }),
       });
       const suggested = cat.result.suggested_category as
-        | { code?: string; name?: string }
+        | { id?: string; code?: string; name?: string }
         | null
         | undefined;
+      setCategoryId(suggested?.id || null);
       setCategoryNote(
         suggested
           ? `Suggested: ${suggested.code} — ${suggested.name}. ${cat.explanation}`
           : cat.explanation
       );
       setCategoryConfirmed(false);
+      setCategorySaved(false);
     } catch {
       // Assist panels are optional; invoice detail still works
     }
   }, [id]);
+
+  async function persistCategory() {
+    if (!categoryId || !categoryConfirmed) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await apiFetch<InvoiceDetail>(
+        `/api/v1/invoices/${id}/category`,
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            accounting_category_id: categoryId,
+            confirmed: true,
+          }),
+        }
+      );
+      setInv(data);
+      setCategorySaved(true);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Category save failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   useEffect(() => {
     void load();
@@ -246,23 +274,72 @@ export default function InvoiceDetailPage() {
               <section className="space-y-2 rounded-lg border border-slate/15 bg-white/80 p-4">
                 <h2 className="font-medium text-ink">Category suggestion</h2>
                 <p className="text-sm text-slate">{categoryNote}</p>
+                {inv.accounting_category_code && (
+                  <p className="text-xs text-accent">
+                    Saved category: {inv.accounting_category_code} —{" "}
+                    {inv.accounting_category_name}
+                  </p>
+                )}
                 <label className="flex items-start gap-2 text-sm text-ink">
                   <input
                     type="checkbox"
                     checked={categoryConfirmed}
                     onChange={(e) => setCategoryConfirmed(e.target.checked)}
                     className="mt-1"
+                    disabled={!categoryId}
                   />
                   <span>
-                    I confirm this category (required before treating it as
-                    saved — AI does not write the category automatically).
+                    I confirm this category (AI does not write it — you must
+                    save after checking).
                   </span>
                 </label>
-                {categoryConfirmed && (
+                <button
+                  type="button"
+                  disabled={busy || !categoryConfirmed || !categoryId}
+                  onClick={() => void persistCategory()}
+                  className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  Save confirmed category
+                </button>
+                {categorySaved && (
                   <p className="text-xs text-accent">
-                    Confirmation recorded locally for this session.
+                    Category persisted on the invoice via PATCH.
                   </p>
                 )}
+              </section>
+            )}
+
+            {inv.documents && inv.documents.length > 0 && (
+              <section className="space-y-3 rounded-lg border border-slate/15 bg-white/80 p-4">
+                <h2 className="font-medium text-ink">Document preview</h2>
+                <p className="text-xs text-slate">
+                  Metadata only — no paid OCR; pasted text previews when present.
+                </p>
+                <ul className="space-y-3">
+                  {inv.documents.map((doc) => (
+                    <li
+                      key={doc.id}
+                      className="rounded-md border border-slate/10 bg-mist/30 px-3 py-2 text-sm"
+                    >
+                      <p className="font-medium text-ink">{doc.filename}</p>
+                      <p className="mt-1 text-xs text-slate">
+                        {doc.content_type} · {doc.byte_size} bytes ·{" "}
+                        {doc.storage_path}
+                        {doc.created_at ? ` · ${doc.created_at}` : ""}
+                      </p>
+                      {doc.has_ocr_text ? (
+                        <p className="mt-2 whitespace-pre-wrap text-xs text-slate">
+                          OCR preview ({doc.ocr_char_count} chars):{" "}
+                          {doc.ocr_text_preview || "—"}
+                        </p>
+                      ) : (
+                        <p className="mt-2 text-xs text-slate">
+                          No OCR text attached.
+                        </p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
               </section>
             )}
 

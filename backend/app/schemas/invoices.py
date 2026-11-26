@@ -54,6 +54,16 @@ class InvoiceUpdate(BaseModel):
     subtotal: Decimal | None = None
     tax_total: Decimal | None = None
     total: Decimal | None = None
+    # Persist confirmed AI category suggestion (user must confirm in UI first)
+    accounting_category_id: UUID | None = None
+    category_confirmed: bool | None = None
+
+
+class CategoryConfirm(BaseModel):
+    """Confirm and persist a suggested accounting category."""
+
+    accounting_category_id: UUID
+    confirmed: bool = True
 
 
 class InvoiceWorkflowAction(BaseModel):
@@ -61,6 +71,21 @@ class InvoiceWorkflowAction(BaseModel):
 
     action: str = Field(description="submit_review | submit_approval")
     notes: str | None = None
+
+
+class DocumentPreviewOut(BaseModel):
+    """Tight document metadata for invoice preview (no binary payload)."""
+
+    id: UUID
+    filename: str
+    content_type: str
+    storage_path: str
+    byte_size: int
+    has_ocr_text: bool
+    ocr_char_count: int = 0
+    ocr_text_preview: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class InvoiceOut(BaseModel):
@@ -79,6 +104,9 @@ class InvoiceOut(BaseModel):
     po_reference: str | None
     terms: str | None
     status: str
+    accounting_category_id: UUID | None = None
+    accounting_category_code: str | None = None
+    accounting_category_name: str | None = None
     has_duplicate_warning: bool
     has_anomaly_signal: bool
     anomaly_notes: str | None
@@ -88,6 +116,7 @@ class InvoiceOut(BaseModel):
     updated_at: datetime
     lines: list[InvoiceLineOut] = Field(default_factory=list)
     validation_issues: list[str] = Field(default_factory=list)
+    documents: list[DocumentPreviewOut] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 

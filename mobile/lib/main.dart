@@ -4,6 +4,7 @@ import 'screens/capture_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/invoice_list_screen.dart';
 import 'screens/login_screen.dart';
+import 'services/session.dart';
 
 void main() {
   runApp(const InvoiceAiApp());
@@ -24,7 +25,7 @@ class InvoiceAiApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      initialRoute: '/login',
+      initialRoute: Session.instance.isLoggedIn ? '/home' : '/login',
       routes: {
         '/login': (_) => const LoginScreen(),
         '/home': (_) => const HomeScreen(),

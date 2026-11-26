@@ -21,13 +21,20 @@ export default function InvoicesPage() {
   const [items, setItems] = useState<InvoiceListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [status, setStatus] = useState("");
+  const [search, setSearch] = useState("");
+  const [query, setQuery] = useState("");
+  const [anomalyOnly, setAnomalyOnly] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
+    setLoading(true);
     try {
       const qs = new URLSearchParams({ page_size: "100" });
       if (status) qs.set("status", status);
+      if (query.trim()) qs.set("search", query.trim());
+      if (anomalyOnly) qs.set("has_anomaly", "true");
       const data = await apiFetch<{ items: InvoiceListItem[]; total: number }>(
         `/api/v1/invoices?${qs}`
       );
@@ -35,8 +42,10 @@ export default function InvoicesPage() {
       setTotal(data.total);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load invoices");
+    } finally {
+      setLoading(false);
     }
-  }, [status]);
+  }, [status, query, anomalyOnly]);
 
   useEffect(() => {
     void load();
@@ -49,16 +58,53 @@ export default function InvoicesPage() {
           <div>
             <h1 className="font-display text-3xl text-ink">Invoices</h1>
             <p className="mt-1 text-sm text-slate">
-              Capture, review, and track payables ({total})
+              Capture, review, approve, and pay — {total} matching
             </p>
           </div>
-          <Link
-            href="/invoices/new"
-            className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-          >
-            New invoice
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/extract"
+              className="rounded-md border border-accent px-4 py-2 text-sm font-medium text-accent hover:bg-accentSoft"
+            >
+              Extract assist
+            </Link>
+            <Link
+              href="/invoices/new"
+              className="rounded-md bg-accent px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+            >
+              New invoice
+            </Link>
+          </div>
         </header>
+
+        <form
+          className="flex flex-wrap gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setQuery(search);
+          }}
+        >
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search invoice number…"
+            className="min-w-[12rem] flex-1 rounded-md border border-slate/20 bg-white/80 px-3 py-2 text-sm text-ink"
+          />
+          <button
+            type="submit"
+            className="rounded-md border border-slate/20 px-3 py-2 text-sm text-slate hover:bg-mist"
+          >
+            Search
+          </button>
+          <label className="flex items-center gap-2 rounded-md border border-slate/15 bg-white/70 px-3 py-2 text-xs text-slate">
+            <input
+              type="checkbox"
+              checked={anomalyOnly}
+              onChange={(e) => setAnomalyOnly(e.target.checked)}
+            />
+            Anomaly / duplicate flags
+          </label>
+        </form>
 
         <div className="flex flex-wrap gap-2">
           {STATUS_FILTERS.map((s) => (
@@ -76,6 +122,8 @@ export default function InvoicesPage() {
             </button>
           ))}
         </div>
+
+        {loading && <p className="text-sm text-slate">Loading invoices…</p>}
 
         {error && (
           <p className="rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">

@@ -1,6 +1,6 @@
 # Invoice AI — MVP Specification
 
-Portfolio MVP for Product 4 (Invoice AI). **Milestone 3** delivers AIProvider extract/category/anomaly explain, Invoice Anomaly Radar UI, document metadata registration, and AI API tests. Flutter capture remains M4.
+Portfolio MVP for Product 4 (Invoice AI). **Milestone 4** delivers polish: aging/supplier-spend reports + CSV, category confirm PATCH, document preview metadata, web UX polish, Flutter capture/list against API, DEMO.md, and expanded tests.
 
 ## Purpose
 
@@ -23,22 +23,22 @@ Every business record is organization-scoped. Endpoints enforce tenant authoriza
 |--------|--------|
 | Organization | Tenant root |
 | User | Auth subject + role (`admin` / `reviewer` / `approver` / `staff`) |
-| Supplier | Vendor directory — **CRUD (M2)** |
-| Invoice | Header + workflow status — **CRUD + workflow (M2)** |
+| Supplier | Vendor directory — **CRUD** |
+| Invoice | Header + workflow status — **CRUD + workflow** |
 | InvoiceLine | Nested on invoice create/update; deterministic line totals |
-| InvoiceDocument | Metadata register + optional pasted OCR text (**M3**) |
+| InvoiceDocument | Metadata + OCR text preview fields (**M4** tightened) |
 | InvoiceReview | Validation notes / flags (seed; full UX later) |
-| ApprovalStep | Approve/reject with comments — **API (M2)** |
-| Payment | Date, amount, method/reference; updates balance — **API (M2)** |
-| PurchaseOrderReference | Candidate PO match only (**M3** extract assist) |
-| AccountingCategory | Suggested category; user confirms (**M3**) |
-| AuditEvent | Seed + create/update/approve/pay/document mutations |
+| ApprovalStep | Approve/reject with comments |
+| Payment | Date, amount, method/reference; updates balance |
+| PurchaseOrderReference | Candidate PO match only |
+| AccountingCategory | Suggested category; user confirms via **PATCH** (**M4**) |
+| AuditEvent | Seed + create/update/approve/pay/document/category mutations |
 
 ### Invoice statuses
 
 Uploaded → Processing → Needs Review → Pending Approval → Approved / Rejected → Partially Paid → Paid → Archived
 
-M2 workflow actions: `submit_review`, `submit_approval`, approve/reject, record payment.
+Workflow actions: `submit_review`, `submit_approval`, approve/reject, record payment.
 
 ## API groups (`/api/v1`)
 
@@ -47,17 +47,18 @@ M2 workflow actions: `submit_review`, `submit_approval`, approve/reject, record 
 | `/auth` | Demo JWT login + `/me` |
 | `/suppliers` | Full CRUD (archive on DELETE); admin for mutations |
 | `/invoices` | CRUD + nested lines + workflow; `has_anomaly` list filter |
+| `/invoices/{id}/category` | **M4** PATCH confirm category |
 | `/invoice-lines` | Nested via invoices; standalone stub |
-| `/documents` | **M3** metadata register/list/get (no OCR SaaS) |
+| `/documents` | Metadata register/list/get + preview fields |
 | `/invoice-reviews` | Coming Soon stub |
 | `/approvals` | POST decide (role-checked) + pending list |
 | `/payments` | POST record updates `amount_paid` / `balance_due` / status |
-| `/reports/payables` | Coming Soon stub |
-| `/ai/invoice-extract` | **M3** text→JSON + confidence; OCR unverified until review |
-| `/ai/invoice-anomalies` | **M3** Anomaly Radar (rules-first; never fraud) |
-| `/ai/category-suggestion` | **M3** suggestion; `requires_confirmation=true` |
+| `/reports/payables` | **M4** overview + `/aging` + `/supplier-spend` + `/export.csv` |
+| `/ai/invoice-extract` | Text→JSON + confidence; OCR unverified until review |
+| `/ai/invoice-anomalies` | Anomaly Radar (rules-first; never fraud) |
+| `/ai/category-suggestion` | Suggestion; `requires_confirmation=true` |
 
-Health (outside prefix): `GET /health` → version `0.3.0-m3`
+Health (outside prefix): `GET /health` → version `0.4.0-m4`
 
 Shared conventions: REST JSON, UUID PKs, UTC timestamps, decimal monetary values, error shape `{error:{code,message,details}}`.
 
@@ -67,19 +68,21 @@ AI baseline: `{input, context_ids, options}` → `{result, explanation, sources,
 
 | # | Criterion | Status |
 |---|-----------|--------|
-| 1 | Capture creates draft invoice | **Done** (M2) |
-| 2 | OCR unverified until user review | **Done** (M3 extract `ocr_verified=false`) |
-| 3 | Duplicate supplier + invoice number flagged | **Done** (M2 + radar `duplicate_like`) |
-| 4 | Totals deterministic (code, not AI) | **Done** (`app.services.totals`) |
+| 1 | Capture creates draft invoice | **Done** |
+| 2 | OCR unverified until user review | **Done** |
+| 3 | Duplicate supplier + invoice number flagged | **Done** |
+| 4 | Totals deterministic (code, not AI) | **Done** |
 | 5 | Approvals role-checked and audited | **Done** |
 | 6 | Partial/full payments update balance | **Done** |
-| 7 | Anomaly is review signal, not fraud | **Done** (Radar; `is_fraud_verdict=false`) |
+| 7 | Anomaly is review signal, not fraud | **Done** |
 | 8 | Local setup: Docker Postgres + health + demo login | **Done** |
-| 9 | No paid APIs / OCR services required | **Met** (`AI_PROVIDER=demo`) |
+| 9 | No paid APIs / OCR services required | **Met** |
 | 10 | Seed 10 suppliers / 25 invoices + multi-role + tenant tests | **Done** |
-| 11 | Web UI list/create/review/approve/pay | **Done** (M2) |
-| 12 | Extract assist + Anomaly Radar UI | **Done** (M3) |
-| 13 | Category suggestion requires user confirm | **Done** (M3) |
+| 11 | Web UI list/create/review/approve/pay | **Done** |
+| 12 | Extract assist + Anomaly Radar UI | **Done** |
+| 13 | Category suggestion requires user confirm | **Done** (PATCH persist **M4**) |
+| 14 | Aging + supplier-spend + CSV | **Done** (M4) |
+| 15 | Flutter list/capture against API | **Done** (M4; camera ML Kit optional) |
 
 ## Seed
 
@@ -92,31 +95,27 @@ AI baseline: `{input, context_ids, options}` → `{result, explanation, sources,
 
 ## Backlog by milestone
 
-### M2 — Core payables — **Done**
+### M1–M3 — **Done**
 
-- Invoice/supplier CRUD + capture → review
-- Deterministic validation (subtotal+tax vs total, duplicates, due-before-invoice)
-- Payment recording updating `amount_paid` / `balance_due`
-- Role-checked approve/reject with audit
-- Web UI + API tests
+See prior README / chat history for scope.
 
-### M3 — AI + differentiator — **Done**
+### M4 — Polish — **Done**
 
-- Wire DemoAIProvider (+ optional Ollama) for extract / category / anomaly **explain**
-- Invoice Anomaly Radar UI: rules-first signals; never fraud verdict
-- Category suggestion requires user confirm
-- Document metadata upload path (no OCR SaaS)
-- PO match returned as **candidate only**
-- Validation issue explanations on extract
+- Aging + supplier-spend reports; CSV export
+- Persist category suggestion confirm (PATCH)
+- Tighten document preview metadata
+- Web UX polish (list search/filters, detail documents/category, reports)
+- Flutter capture/list against API; Flutter SDK docs
+- Lint/typecheck + expanded pytest; DEMO.md
 
-### M4 — Polish
+### Remaining gaps (post-M4)
 
-- Flutter camera/gallery + on-device text recognition where free
-- Offline capture drafts + sync status
-- Full approval UX polish, aging/spend reports, CSV export
-- E2E demo script; lint/type gates
+- Flutter offline draft queue + camera/ML Kit OCR wiring
+- Full mobile approve/pay UX
+- Standalone `/invoice-lines` and `/invoice-reviews` beyond stubs
+- Production auth / hosted OCR (out of portfolio free-only policy)
 
-## Anomaly Radar rules (M3)
+## Anomaly Radar rules
 
 | Code | Rule (deterministic) |
 |------|----------------------|
@@ -127,6 +126,6 @@ AI baseline: `{input, context_ids, options}` → `{result, explanation, sources,
 
 AI may explain why a rule fired. **Never** sets `is_fraud_verdict=true` or returns a fraud verdict.
 
-## Out of scope for Milestone 3
+## Out of scope
 
-Do **not** require Ollama, paid OCR/LLM, Flutter mobile run, or full reports/CSV in M3.
+Do **not** require paid OCR/LLM. Ollama remains optional. Flutter camera OCR is optional free ML Kit, not required for demo.

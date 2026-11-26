@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Query
@@ -14,6 +15,8 @@ from app.models import Invoice, InvoiceDocument
 from app.services.audit import record_audit
 
 router = APIRouter()
+
+OCR_PREVIEW_LEN = 280
 
 
 class DocumentCreate(BaseModel):
@@ -33,6 +36,10 @@ class DocumentOut(BaseModel):
     storage_path: str
     byte_size: int
     has_ocr_text: bool
+    ocr_char_count: int = 0
+    ocr_text_preview: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     organization_id: UUID
 
 
@@ -43,15 +50,40 @@ class DocumentListResponse(BaseModel):
     page_size: int = 50
 
 
+def document_preview(doc: InvoiceDocument) -> dict:
+    """Shared preview payload for document list and invoice detail."""
+    text = doc.ocr_text or ""
+    preview = None
+    if text:
+        preview = text[:OCR_PREVIEW_LEN] + ("…" if len(text) > OCR_PREVIEW_LEN else "")
+    return {
+        "id": doc.id,
+        "filename": doc.filename,
+        "content_type": doc.content_type,
+        "storage_path": doc.storage_path,
+        "byte_size": doc.byte_size,
+        "has_ocr_text": bool(text),
+        "ocr_char_count": len(text),
+        "ocr_text_preview": preview,
+        "created_at": doc.created_at,
+        "updated_at": doc.updated_at,
+    }
+
+
 def _out(doc: InvoiceDocument) -> DocumentOut:
+    preview = document_preview(doc)
     return DocumentOut(
-        id=doc.id,
+        id=preview["id"],
         invoice_id=doc.invoice_id,
-        filename=doc.filename,
-        content_type=doc.content_type,
-        storage_path=doc.storage_path,
-        byte_size=doc.byte_size,
-        has_ocr_text=bool(doc.ocr_text),
+        filename=preview["filename"],
+        content_type=preview["content_type"],
+        storage_path=preview["storage_path"],
+        byte_size=preview["byte_size"],
+        has_ocr_text=preview["has_ocr_text"],
+        ocr_char_count=preview["ocr_char_count"],
+        ocr_text_preview=preview["ocr_text_preview"],
+        created_at=preview["created_at"],
+        updated_at=preview["updated_at"],
         organization_id=doc.organization_id,
     )
 

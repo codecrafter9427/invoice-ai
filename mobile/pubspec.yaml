@@ -1,7 +1,7 @@
 name: invoice_ai
-description: Invoice AI Flutter shell — capture and list stubs only.
+description: Invoice AI Flutter app — capture and list against FastAPI.
 publish_to: "none"
-version: 0.1.0+1
+version: 0.4.0+4
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -10,6 +10,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+  http: ^1.2.2
 
 dev_dependencies:
   flutter_test:

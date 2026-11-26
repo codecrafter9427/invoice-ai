@@ -11,8 +11,19 @@ from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, DbSession, require_roles
 from app.core.errors import ApiError, coming_soon
-from app.models import Invoice, InvoiceLine, InvoiceStatus, Supplier, User, UserRole
+from app.models import (
+    AccountingCategory,
+    Invoice,
+    InvoiceLine,
+    InvoiceStatus,
+    Supplier,
+    User,
+    UserRole,
+)
+from app.api.v1.documents import document_preview
 from app.schemas.invoices import (
+    CategoryConfirm,
+    DocumentPreviewOut,
     InvoiceCreate,
     InvoiceLineOut,
     InvoiceListItem,
@@ -49,7 +60,28 @@ def _line_out(line: InvoiceLine) -> InvoiceLineOut:
     )
 
 
-def _invoice_out(inv: Invoice, validation_issues: list[str] | None = None) -> InvoiceOut:
+def _doc_previews(inv: Invoice) -> list[DocumentPreviewOut]:
+    docs = getattr(inv, "documents", None) or []
+    return [DocumentPreviewOut(**document_preview(d)) for d in docs]
+
+
+def _category_labels(
+    db: DbSession, inv: Invoice
+) -> tuple[str | None, str | None]:
+    if not inv.accounting_category_id:
+        return None, None
+    cat = db.get(AccountingCategory, inv.accounting_category_id)
+    if cat is None or cat.organization_id != inv.organization_id:
+        return None, None
+    return cat.code, cat.name
+
+
+def _invoice_out(
+    inv: Invoice,
+    validation_issues: list[str] | None = None,
+    *,
+    db: DbSession | None = None,
+) -> InvoiceOut:
     issues = list(validation_issues or [])
     if inv.has_duplicate_warning and "duplicate_invoice" not in issues:
         issues.append("duplicate_invoice")
@@ -64,6 +96,9 @@ def _invoice_out(inv: Invoice, validation_issues: list[str] | None = None) -> In
         if i not in seen:
             seen.add(i)
             unique_issues.append(i)
+    code, name = (None, None)
+    if db is not None:
+        code, name = _category_labels(db, inv)
     return InvoiceOut(
         id=inv.id,
         organization_id=inv.organization_id,
@@ -80,6 +115,9 @@ def _invoice_out(inv: Invoice, validation_issues: list[str] | None = None) -> In
         po_reference=inv.po_reference,
         terms=inv.terms,
         status=inv.status.value,
+        accounting_category_id=inv.accounting_category_id,
+        accounting_category_code=code,
+        accounting_category_name=name,
         has_duplicate_warning=inv.has_duplicate_warning,
         has_anomaly_signal=inv.has_anomaly_signal,
         anomaly_notes=inv.anomaly_notes,
@@ -89,15 +127,26 @@ def _invoice_out(inv: Invoice, validation_issues: list[str] | None = None) -> In
         updated_at=inv.updated_at,
         lines=[_line_out(ln) for ln in sorted(inv.lines, key=lambda x: x.line_number)],
         validation_issues=unique_issues,
+        documents=_doc_previews(inv),
     )
 
 
 def _get_org_invoice(
-    db: DbSession, user: User, invoice_id: UUID, *, with_lines: bool = True
+    db: DbSession,
+    user: User,
+    invoice_id: UUID,
+    *,
+    with_lines: bool = True,
+    with_documents: bool = False,
 ) -> Invoice:
     q = select(Invoice).where(Invoice.id == invoice_id)
+    options = []
     if with_lines:
-        q = q.options(selectinload(Invoice.lines))
+        options.append(selectinload(Invoice.lines))
+    if with_documents:
+        options.append(selectinload(Invoice.documents))
+    if options:
+        q = q.options(*options)
     inv = db.scalar(q)
     if inv is None or inv.archived:
         raise ApiError(status_code=404, code="not_found", message="Invoice not found")
@@ -357,8 +406,8 @@ def create_invoice(
         },
     )
     db.commit()
-    inv = _get_org_invoice(db, user, inv.id)
-    return _invoice_out(inv)
+    inv = _get_org_invoice(db, user, inv.id, with_documents=True)
+    return _invoice_out(inv, db=db)
 
 
 @router.get("/{invoice_id}", response_model=InvoiceOut)
@@ -367,7 +416,64 @@ def get_invoice(
     user: CurrentUser,
     db: DbSession,
 ) -> InvoiceOut:
-    return _invoice_out(_get_org_invoice(db, user, invoice_id))
+    inv = _get_org_invoice(db, user, invoice_id, with_documents=True)
+    return _invoice_out(inv, db=db)
+
+
+def _apply_category_confirm(
+    db: DbSession,
+    user: User,
+    inv: Invoice,
+    category_id: UUID,
+) -> None:
+    cat = db.get(AccountingCategory, category_id)
+    if cat is None or cat.organization_id != user.organization_id:
+        raise ApiError(
+            status_code=404,
+            code="category_not_found",
+            message="Accounting category not found in your organization",
+        )
+    inv.accounting_category_id = cat.id
+    record_audit(
+        db,
+        organization_id=user.organization_id,
+        actor_id=user.id,
+        entity_type="invoice",
+        entity_id=inv.id,
+        action="category_confirm",
+        details={"accounting_category_id": str(cat.id), "code": cat.code},
+    )
+
+
+@router.patch(
+    "/{invoice_id}/category",
+    response_model=InvoiceOut,
+    dependencies=[
+        Depends(
+            require_roles(
+                UserRole.ADMIN, UserRole.STAFF, UserRole.REVIEWER, UserRole.APPROVER
+            )
+        )
+    ],
+)
+def confirm_category(
+    invoice_id: UUID,
+    body: CategoryConfirm,
+    user: CurrentUser,
+    db: DbSession,
+) -> InvoiceOut:
+    """Persist a user-confirmed category suggestion (AI never auto-writes)."""
+    if not body.confirmed:
+        raise ApiError(
+            status_code=422,
+            code="confirmation_required",
+            message="confirmed must be true to persist category",
+        )
+    inv = _get_org_invoice(db, user, invoice_id, with_documents=True)
+    _apply_category_confirm(db, user, inv, body.accounting_category_id)
+    db.commit()
+    inv = _get_org_invoice(db, user, invoice_id, with_documents=True)
+    return _invoice_out(inv, db=db)
 
 
 @router.patch(
@@ -387,7 +493,24 @@ def update_invoice(
     user: CurrentUser,
     db: DbSession,
 ) -> InvoiceOut:
-    inv = _get_org_invoice(db, user, invoice_id)
+    inv = _get_org_invoice(db, user, invoice_id, with_documents=True)
+    data = body.model_dump(exclude_unset=True)
+
+    category_only = set(data.keys()) <= {
+        "accounting_category_id",
+        "category_confirmed",
+    }
+    if (
+        "accounting_category_id" in data
+        and data.get("accounting_category_id") is not None
+        and data.get("category_confirmed", True) is True
+        and category_only
+    ):
+        _apply_category_confirm(db, user, inv, data["accounting_category_id"])
+        db.commit()
+        inv = _get_org_invoice(db, user, invoice_id, with_documents=True)
+        return _invoice_out(inv, db=db)
+
     if inv.status not in EDITABLE_STATUSES:
         raise ApiError(
             status_code=409,
@@ -395,7 +518,6 @@ def update_invoice(
             message=f"Cannot edit invoice in status {inv.status.value}",
         )
 
-    data = body.model_dump(exclude_unset=True)
     if "supplier_id" in data and data["supplier_id"] is not None:
         _assert_supplier(db, user, data["supplier_id"])
         inv.supplier_id = data["supplier_id"]
@@ -411,6 +533,12 @@ def update_invoice(
         inv.po_reference = data["po_reference"]
     if "terms" in data:
         inv.terms = data["terms"]
+    if (
+        "accounting_category_id" in data
+        and data["accounting_category_id"] is not None
+        and data.get("category_confirmed", True) is True
+    ):
+        _apply_category_confirm(db, user, inv, data["accounting_category_id"])
 
     date_issues = validate_invoice_dates(inv.invoice_date, inv.due_date)
     if date_issues:
@@ -478,8 +606,8 @@ def update_invoice(
         details={"fields": list(data.keys()), "has_duplicate_warning": inv.has_duplicate_warning},
     )
     db.commit()
-    inv = _get_org_invoice(db, user, inv.id)
-    return _invoice_out(inv)
+    inv = _get_org_invoice(db, user, inv.id, with_documents=True)
+    return _invoice_out(inv, db=db)
 
 
 @router.delete(
@@ -504,8 +632,8 @@ def archive_invoice(
         action="archive",
     )
     db.commit()
-    inv = _get_org_invoice(db, user, inv.id)
-    return _invoice_out(inv)
+    inv = _get_org_invoice(db, user, inv.id, with_documents=True)
+    return _invoice_out(inv, db=db)
 
 
 @router.post(
@@ -578,8 +706,8 @@ def invoice_workflow(
         details={"status": inv.status.value, "notes": body.notes},
     )
     db.commit()
-    inv = _get_org_invoice(db, user, inv.id)
-    return _invoice_out(inv)
+    inv = _get_org_invoice(db, user, inv.id, with_documents=True)
+    return _invoice_out(inv, db=db)
 
 
 @lines_router.api_route("", methods=["GET", "POST"])

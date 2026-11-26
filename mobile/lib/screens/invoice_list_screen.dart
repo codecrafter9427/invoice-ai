@@ -1,50 +1,170 @@
 import 'package:flutter/material.dart';
 
-/// Invoice list/status stub — no API wiring.
-class InvoiceListScreen extends StatelessWidget {
+import '../api/client.dart';
+import '../services/session.dart';
+
+class InvoiceListScreen extends StatefulWidget {
   const InvoiceListScreen({super.key});
+
+  @override
+  State<InvoiceListScreen> createState() => _InvoiceListScreenState();
+}
+
+class _InvoiceListScreenState extends State<InvoiceListScreen> {
+  final _search = TextEditingController();
+  List<Map<String, dynamic>> _items = [];
+  bool _loading = true;
+  String? _error;
+  String _status = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final items = await Session.instance.api.listInvoices(
+        status: _status.isEmpty ? null : _status,
+        search: _search.text.trim().isEmpty ? null : _search.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _loading = false;
+      });
+    } on ApiException catch (e) {
+      setState(() {
+        _error = e.message;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Invoices')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Coming Soon',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Invoice list',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Searchable invoice statuses, review/flag, and duplicate warnings '
-              'will appear after Milestone 2 CRUD and seed data.',
-            ),
-            const SizedBox(height: 24),
-            Card(
-              child: ListTile(
-                enabled: false,
-                title: const Text('No invoices yet'),
-                subtitle: const Text('Seed data not loaded'),
-                trailing: Chip(
-                  label: Text(
-                    'Coming Soon',
-                    style: Theme.of(context).textTheme.labelSmall,
+      appBar: AppBar(
+        title: const Text('Invoices'),
+        actions: [
+          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+        ],
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _search,
+                    decoration: const InputDecoration(
+                      labelText: 'Search number',
+                      border: OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => _load(),
                   ),
                 ),
+                const SizedBox(width: 8),
+                FilledButton.tonal(onPressed: _load, child: const Text('Go')),
+              ],
+            ),
+          ),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              children: [
+                for (final s in [
+                  '',
+                  'needs_review',
+                  'pending_approval',
+                  'approved',
+                  'partially_paid',
+                  'paid',
+                ])
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: ChoiceChip(
+                      label: Text(s.isEmpty ? 'all' : s),
+                      selected: _status == s,
+                      onSelected: (_) {
+                        setState(() => _status = s);
+                        _load();
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            ),
+          if (_loading)
+            const Expanded(child: Center(child: CircularProgressIndicator()))
+          else
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _load,
+                child: _items.isEmpty
+                    ? ListView(
+                        children: const [
+                          SizedBox(height: 80),
+                          Center(child: Text('No invoices match.')),
+                        ],
+                      )
+                    : ListView.separated(
+                        itemCount: _items.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (context, i) {
+                          final inv = _items[i];
+                          final flags = <String>[
+                            if (inv['has_duplicate_warning'] == true) 'duplicate',
+                            if (inv['has_anomaly_signal'] == true) 'anomaly',
+                          ].join(' · ');
+                          return ListTile(
+                            title: Text('${inv['invoice_number']}'),
+                            subtitle: Text(
+                              '${inv['supplier_name'] ?? inv['supplier_id']}\n'
+                              '${inv['status']} · ${inv['currency']} ${inv['total']}'
+                              '${flags.isEmpty ? '' : '\n$flags'}',
+                            ),
+                            isThreeLine: true,
+                            trailing: Text(
+                              '${inv['balance_due']}',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                          );
+                        },
+                      ),
               ),
             ),
-          ],
-        ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => Navigator.of(context).pushNamed('/capture'),
+        icon: const Icon(Icons.add_a_photo_outlined),
+        label: const Text('Capture'),
       ),
     );
   }

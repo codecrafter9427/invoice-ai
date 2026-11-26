@@ -79,8 +79,8 @@ export default function DashboardPage() {
             Payables overview
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate">
-            Live queue counts from org-scoped invoices. Aging reports and Anomaly
-            Radar land in later milestones.
+            Live queue counts from org-scoped invoices. Use Reports for aging and
+            supplier spend, or Anomaly Radar for review signals (never fraud).
           </p>
         </div>
         <ul className="grid gap-3 sm:grid-cols-2">
@@ -101,8 +101,15 @@ export default function DashboardPage() {
         <p className="text-sm text-slate">
           <Link href="/invoices/new" className="text-accent hover:underline">
             Create a manual invoice
-          </Link>{" "}
-          to walk the review → approve → pay path.
+          </Link>
+          {" · "}
+          <Link href="/reports" className="text-accent hover:underline">
+            Aging & spend reports
+          </Link>
+          {" · "}
+          <Link href="/anomaly-radar" className="text-accent hover:underline">
+            Anomaly Radar
+          </Link>
         </p>
       </section>
     </AppShell>
