@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-a: #f7f9fc;
+  --bg-b: #e4edf5;
+  --ink: #0f1c2e;
+  --accent: #1a6b5c;
+}
+
+body {
+  color: var(--ink);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, #d4ebe6 0%, transparent 55%),
+    radial-gradient(900px 500px at 100% 0%, #d9e6f5 0%, transparent 50%),
+    linear-gradient(180deg, var(--bg-a), var(--bg-b));
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}

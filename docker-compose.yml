@@ -1,0 +1,22 @@
+# Local PostgreSQL only — no paid services.
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: invoiceai-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: invoiceai
+      POSTGRES_PASSWORD: invoiceai_dev_password
+      POSTGRES_DB: invoice_ai
+    ports:
+      - "5434:5432"
+    volumes:
+      - invoiceai_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U invoiceai -d invoice_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  invoiceai_pgdata:
