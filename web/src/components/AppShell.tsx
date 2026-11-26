@@ -46,7 +46,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <p className="mt-1 truncate text-xs text-slate">{email}</p>
           <nav className="mt-6 flex flex-row flex-wrap gap-2 md:flex-col">
             {NAV.map((item) => {
-              const active = pathname === item.href;
+              const active =
+                pathname === item.href ||
+                (item.href !== "/dashboard" &&
+                  pathname?.startsWith(`${item.href}/`));
               return (
                 <Link
                   key={item.href}

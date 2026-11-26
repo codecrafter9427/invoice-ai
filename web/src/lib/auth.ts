@@ -11,6 +11,11 @@ export function getDemoEmail(): string | null {
   return localStorage.getItem(DEMO_EMAIL_KEY);
 }
 
+export function getDemoToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(DEMO_TOKEN_KEY);
+}
+
 export function setDemoSession(token: string, email: string): void {
   localStorage.setItem(DEMO_TOKEN_KEY, token);
   localStorage.setItem(DEMO_EMAIL_KEY, email);
