@@ -1,39 +1,58 @@
-"""Demo login placeholder — not production auth."""
+"""Demo login with JWT + org-scoped identity (prototype, not production)."""
 
 from fastapi import APIRouter
+from sqlalchemy import select
 
-from app.core.config import get_settings
+from app.api.deps import CurrentUser, DbSession
 from app.core.errors import ApiError
-from app.schemas.common import DemoLoginRequest, DemoLoginResponse
+from app.core.security import create_access_token, verify_password
+from app.models import Organization, User
+from app.schemas.common import DemoLoginRequest, DemoLoginResponse, MeResponse
 
 router = APIRouter()
 
 
 @router.post("/demo-login", response_model=DemoLoginResponse)
-async def demo_login(body: DemoLoginRequest) -> DemoLoginResponse:
-    settings = get_settings()
-    if (
-        body.email != settings.demo_user_email
-        or body.password != settings.demo_user_password
-    ):
+def demo_login(body: DemoLoginRequest, db: DbSession) -> DemoLoginResponse:
+    email = body.email.strip().lower()
+    user = db.scalar(select(User).where(User.email == email, User.is_active.is_(True)))
+    if user is None or not verify_password(body.password, user.hashed_password):
         raise ApiError(
             status_code=401,
             code="invalid_credentials",
             message="Invalid demo credentials",
         )
+    org = db.get(Organization, user.organization_id)
+    if org is None or not org.is_active:
+        raise ApiError(
+            status_code=403,
+            code="org_inactive",
+            message="Organization is inactive",
+        )
+    token = create_access_token(
+        user_id=user.id,
+        organization_id=user.organization_id,
+        email=user.email,
+        role=user.role.value,
+    )
     return DemoLoginResponse(
-        access_token="demo-placeholder-token",
-        email=body.email,
-        role="admin",
+        access_token=token,
+        email=user.email,
+        role=user.role.value,
+        organization_id=user.organization_id,
+        organization_name=org.name,
+        user_id=user.id,
     )
 
 
-@router.get("/me")
-async def me() -> dict:
-    settings = get_settings()
-    return {
-        "email": settings.demo_user_email,
-        "role": "admin",
-        "demo": True,
-        "message": "Demo identity placeholder — wire JWT/session in Milestone 1+",
-    }
+@router.get("/me", response_model=MeResponse)
+def me(user: CurrentUser, db: DbSession) -> MeResponse:
+    org = db.get(Organization, user.organization_id)
+    return MeResponse(
+        user_id=user.id,
+        email=user.email,
+        full_name=user.full_name,
+        role=user.role.value,
+        organization_id=user.organization_id,
+        organization_name=org.name if org else "",
+    )

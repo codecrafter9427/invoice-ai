@@ -25,3 +25,11 @@ export const DEMO_CREDENTIALS = {
   email: "demo@invoiceai.local",
   password: "demo",
 } as const;
+
+/** Seeded demo users (password: demo for all). */
+export const DEMO_USERS = [
+  { email: "demo@invoiceai.local", role: "admin", label: "Admin / Finance Manager" },
+  { email: "reviewer@invoiceai.local", role: "reviewer", label: "Reviewer" },
+  { email: "approver@invoiceai.local", role: "approver", label: "Approver" },
+  { email: "staff@invoiceai.local", role: "staff", label: "Staff" },
+] as const;

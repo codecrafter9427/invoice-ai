@@ -1,4 +1,4 @@
-"""SQLAlchemy engine/session placeholders — schema not implemented yet."""
+"""SQLAlchemy engine and session factory."""
 
 from collections.abc import Generator
 
@@ -14,11 +14,10 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 class Base(DeclarativeBase):
-    """Declarative base for future Invoice AI models."""
+    """Declarative base for Invoice AI models."""
 
 
 def get_db() -> Generator[Session, None, None]:
-    """Yield a DB session. Models/migrations are Coming Soon."""
     db = SessionLocal()
     try:
         yield db

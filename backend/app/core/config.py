@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -22,12 +22,12 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3004"
 
     database_url: str = (
-        "postgresql+psycopg://invoiceai:invoiceai_dev_password@localhost:5434/invoice_ai"
+        "postgresql+psycopg://invoiceai:invoiceai_dev_password@localhost:5436/invoice_ai"
     )
 
     demo_user_email: str = "demo@invoiceai.local"
     demo_user_password: str = "demo"
-    secret_key: str = "change-me-local-dev-only"
+    secret_key: str = "change-me-local-dev-only-32b-min"
     access_token_expire_minutes: int = 60
 
     ai_provider: str = "demo"

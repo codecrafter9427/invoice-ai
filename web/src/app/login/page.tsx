@@ -45,7 +45,7 @@ export default function LoginPage() {
         </p>
         <h1 className="mt-2 font-display text-4xl text-ink">Invoice AI</h1>
         <p className="mt-3 text-slate">
-          Demo login placeholder. No production auth in this scaffold.
+          Demo JWT login against the local API. Prototype auth only — not production.
         </p>
         <form onSubmit={onSubmit} className="mt-8 space-y-4">
           <label className="block text-sm">
@@ -80,7 +80,8 @@ export default function LoginPage() {
           </button>
         </form>
         <p className="mt-4 text-xs text-slate">
-          Credentials: {DEMO_CREDENTIALS.email} / {DEMO_CREDENTIALS.password}
+          Default: {DEMO_CREDENTIALS.email} / {DEMO_CREDENTIALS.password}. Also:
+          reviewer@, approver@, staff@invoiceai.local (password: demo).
         </p>
       </div>
     </div>

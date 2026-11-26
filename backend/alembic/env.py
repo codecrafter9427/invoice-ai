@@ -1,4 +1,4 @@
-"""Alembic environment placeholder — wire models when migrations are added."""
+"""Alembic environment — uses app models metadata and DATABASE_URL from settings."""
 
 from logging.config import fileConfig
 
@@ -7,6 +7,20 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import get_settings
 from app.core.db import Base
+from app.models import (  # noqa: F401 — register metadata
+    AccountingCategory,
+    ApprovalStep,
+    AuditEvent,
+    Invoice,
+    InvoiceDocument,
+    InvoiceLine,
+    InvoiceReview,
+    Organization,
+    Payment,
+    PurchaseOrderReference,
+    Supplier,
+    User,
+)
 
 config = context.config
 if config.config_file_name is not None:

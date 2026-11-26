@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: invoiceai_dev_password
       POSTGRES_DB: invoice_ai
     ports:
-      - "5434:5432"
+      - "5436:5432"
     volumes:
       - invoiceai_pgdata:/var/lib/postgresql/data
     healthcheck:
