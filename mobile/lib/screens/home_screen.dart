@@ -43,7 +43,7 @@ class HomeScreen extends StatelessWidget {
               leading: const Icon(Icons.photo_camera_outlined),
               title: const Text('Capture invoice'),
               subtitle: const Text(
-                'Paste OCR text → extract assist → create draft',
+                'Camera/gallery OCR or paste → extract → draft',
               ),
               onTap: () => Navigator.of(context).pushNamed('/capture'),
             ),
@@ -58,9 +58,10 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           Text(
-            'On-device camera OCR is optional (free ML Kit). This MVP uses '
-            'pasted/demo text + the same DemoAIProvider extract as web. '
-            'No paid OCR.',
+            'Capture uses free on-device ML Kit OCR (camera/gallery) or paste. '
+            'Same DemoAIProvider extract as web. OCR stays unverified until '
+            'review; drafts never auto-submit. No paid OCR. Offline queue is '
+            'not included.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],

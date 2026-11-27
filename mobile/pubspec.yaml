@@ -1,7 +1,7 @@
 name: invoice_ai
 description: Invoice AI Flutter app — capture and list against FastAPI.
 publish_to: "none"
-version: 0.4.0+4
+version: 0.5.0+5
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
@@ -11,6 +11,9 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   http: ^1.2.2
+  # Free on-device OCR only — no paid OCR services.
+  image_picker: ^1.1.2
+  google_mlkit_text_recognition: ^0.14.0
 
 dev_dependencies:
   flutter_test:

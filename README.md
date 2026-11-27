@@ -2,6 +2,8 @@
 
 Supplier invoice capture, extraction review, approval, payment tracking, and payable visibility for small businesses.
 
+**Milestone 5 (mobile OCR):** Flutter camera/gallery → free on-device ML Kit text recognition → review → save draft. Paste fallback kept. No paid OCR, no offline queue, no auto-approve.
+
 **Milestone 4 complete:** aging + supplier-spend reports with CSV export, category suggestion confirm via PATCH, tightened document preview metadata, web UX polish, Flutter capture/list against API, expanded tests, and a scripted [DEMO.md](./DEMO.md).
 
 ## Purpose
@@ -20,7 +22,7 @@ Supplier invoice capture, extraction review, approval, payment tracking, and pay
 | Web | Next.js + TypeScript |
 | Backend | FastAPI + Pydantic + SQLAlchemy + Alembic |
 | Database | PostgreSQL (UUID PKs, `Numeric` monetary decimals) |
-| Mobile | Flutter (login / list / capture draft against API) |
+| Mobile | Flutter (login / list / capture with free ML Kit OCR + paste) |
 | AI | `AIProvider` + `DemoAIProvider` (default); optional Ollama adapter |
 | Auth | Demo JWT login, org-scoped authorization |
 
@@ -29,7 +31,7 @@ Supplier invoice capture, extraction review, approval, payment tracking, and pay
 ```
 products/invoice-ai/
   README.md
-  DEMO.md                     # Scripted M4 checklist
+  DEMO.md                     # Scripted M4/M5 checklist
   MVP_SPEC.md
   .env.example
   docker-compose.yml          # Postgres on host port 5436
@@ -181,6 +183,7 @@ Short path:
 | **M2** | Supplier/invoice CRUD, totals/duplicates/dates, workflow, approvals + audit, payments + balance, web UI, API tests | **Done** |
 | **M3** | AIProvider extract/category/anomaly explain; Invoice Anomaly Radar UI; document metadata upload | **Done** |
 | **M4** | Reports + CSV, category confirm PATCH, document preview, web/Flutter polish, DEMO.md, expanded tests | **Done** |
+| **M5** | Flutter camera/gallery + free ML Kit OCR → review → draft (`submit_for_review: false`); paste fallback; no offline queue | **Done** |
 
 ## Known limitations
 
@@ -189,7 +192,7 @@ Short path:
 - Anomaly Radar never auto-blocks payment; signals are advisory
 - Category suggestion is not accounting/tax advice; confirm before save
 - Standalone `/invoice-lines` remains a stub (lines nest under invoices)
-- Flutter camera/ML Kit OCR and offline draft queue are optional / Coming Soon (paste-text capture works)
+- Flutter offline draft queue remains out of scope (M5 ships on-device OCR only)
 - Mobile approvals/payments UX remain web-primary for the demo
 
 See [MVP_SPEC.md](./MVP_SPEC.md) for entities, API groups, and acceptance criteria.

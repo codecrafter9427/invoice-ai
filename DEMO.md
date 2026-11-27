@@ -1,6 +1,8 @@
-# Invoice AI — Milestone 4 demo checklist
+# Invoice AI — Milestone 4 / 5 demo checklist
 
 Scripted walkthrough for local demo (no paid APIs / OCR). Tick each step.
+
+**M5:** Mobile camera/gallery free ML Kit OCR → review → draft (paste fallback OK).
 
 ## Prerequisites
 
@@ -76,13 +78,17 @@ Password for all accounts: **`demo`**
 3. [ ] Supplier spend table loads
 4. [ ] **Export aging CSV** and **Export spend CSV** download
 
-## Mobile demo (optional)
+## Mobile demo (M5 OCR)
 
 1. [ ] `cd mobile && flutter pub get && flutter run`
 2. [ ] Set API base URL (emulator `http://10.0.2.2:8004`)
 3. [ ] Login as `staff@invoiceai.local` / `demo`
 4. [ ] **Invoice list** shows seeded statuses
-5. [ ] **Capture** → Run extract → review checkbox → Save draft → appears in list
+5. [ ] **Capture → Camera or Gallery** → on-device ML Kit fills OCR text (or use paste fallback)
+6. [ ] Confirm messaging shows `ocr_verified=false` / unverified until review
+7. [ ] **Run extract** → edit fields → check **I reviewed** → **Save capture draft**
+8. [ ] Confirm draft appears in list (not auto-submitted for review / not approved)
+9. [ ] Confirm save is blocked if review checkbox is unchecked
 
 ## API-only smoke
 

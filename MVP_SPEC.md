@@ -1,6 +1,6 @@
 # Invoice AI — MVP Specification
 
-Portfolio MVP for Product 4 (Invoice AI). **Milestone 4** delivers polish: aging/supplier-spend reports + CSV, category confirm PATCH, document preview metadata, web UX polish, Flutter capture/list against API, DEMO.md, and expanded tests.
+Portfolio MVP for Product 4 (Invoice AI). **Milestone 5** wires Flutter camera/gallery → free on-device ML Kit OCR → review → draft save (paste fallback kept). **Milestone 4** delivered polish: aging/supplier-spend reports + CSV, category confirm PATCH, document preview metadata, web UX polish, Flutter capture/list against API, DEMO.md, and expanded tests.
 
 ## Purpose
 
@@ -82,7 +82,8 @@ AI baseline: `{input, context_ids, options}` → `{result, explanation, sources,
 | 12 | Extract assist + Anomaly Radar UI | **Done** |
 | 13 | Category suggestion requires user confirm | **Done** (PATCH persist **M4**) |
 | 14 | Aging + supplier-spend + CSV | **Done** (M4) |
-| 15 | Flutter list/capture against API | **Done** (M4; camera ML Kit optional) |
+| 15 | Flutter list/capture against API | **Done** (M4) |
+| 16 | Flutter camera/gallery free ML Kit OCR → review → draft | **Done** (M5; no paid OCR / no auto-approve) |
 
 ## Seed
 
@@ -108,9 +109,17 @@ See prior README / chat history for scope.
 - Flutter capture/list against API; Flutter SDK docs
 - Lint/typecheck + expanded pytest; DEMO.md
 
-### Remaining gaps (post-M4)
+### M5 — Mobile OCR — **Done**
 
-- Flutter offline draft queue + camera/ML Kit OCR wiring
+- `image_picker` + `google_mlkit_text_recognition` (free on-device only)
+- Capture: camera/gallery → OCR text → extract assist → review checkbox → draft (`submit_for_review: false`)
+- Paste fallback retained; Android/iOS permissions declared
+- OCR unit tests with fakes; widget tests updated
+- No DB migration; reuses `POST /ai/invoice-extract` and `POST /invoices`
+
+### Remaining gaps (post-M5)
+
+- Flutter offline draft queue (explicitly out of M5)
 - Full mobile approve/pay UX
 - Standalone `/invoice-lines` and `/invoice-reviews` beyond stubs
 - Production auth / hosted OCR (out of portfolio free-only policy)
@@ -128,4 +137,4 @@ AI may explain why a rule fired. **Never** sets `is_fraud_verdict=true` or retur
 
 ## Out of scope
 
-Do **not** require paid OCR/LLM. Ollama remains optional. Flutter camera OCR is optional free ML Kit, not required for demo.
+Do **not** require paid OCR/LLM. Ollama remains optional. Flutter camera OCR uses free on-device ML Kit only (M5); paste remains a valid demo path.
