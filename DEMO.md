@@ -1,6 +1,8 @@
-# Invoice AI — Milestone 4 / 5 demo checklist
+# Invoice AI — Milestone 4 / 5 / 6 demo checklist
 
 Scripted walkthrough for local demo (no paid APIs / OCR). Tick each step.
+
+**M6:** Reviews queue, human PO confirm, Insights connector (`0.6.0-m6`).
 
 **M5:** Mobile camera/gallery free ML Kit OCR → review → draft (paste fallback OK).
 
@@ -31,11 +33,20 @@ npm install
 npm run dev                   # http://localhost:3004
 ```
 
-- [ ] `GET http://localhost:8004/health` → `version`: **`0.4.0-m4`**
+- [ ] `GET http://localhost:8004/health` → `version`: **`0.6.0-m6`**
 
 ## Web demo (primary)
 
 Password for all accounts: **`demo`**
+
+### M6. Reviews queue + PO confirm + Insights
+
+- [ ] Sign in as `reviewer@invoiceai.local` → **Reviews** nav → needs-review queue loads
+- [ ] Add a review note on a queue item (or open invoice detail)
+- [ ] Open `INV-ANOM-PAY-03` → **PO match** shows candidates + amount/supplier diffs
+- [ ] Check Confirm → **Link PO** → `purchase_order_reference_id` set (staff gets 403)
+- [ ] `GET /api/v1/connectors/insights/v1/health` → `product: invoice-ai`
+- [ ] `GET /api/v1/connectors/insights/v1/payables/summary` with Bearer JWT → outstanding + paid_this_month + aging_totals
 
 ### A. Capture → review → approve → pay
 

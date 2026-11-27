@@ -12,6 +12,7 @@ import {
   type AnomalySignal,
   type InvoiceDetail,
   type Payment,
+  type PoCandidatesResponse,
 } from "@/lib/api";
 
 export default function InvoiceDetailPage() {
@@ -30,6 +31,8 @@ export default function InvoiceDetailPage() {
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [categoryConfirmed, setCategoryConfirmed] = useState(false);
   const [categorySaved, setCategorySaved] = useState(false);
+  const [poData, setPoData] = useState<PoCandidatesResponse | null>(null);
+  const [poConfirmId, setPoConfirmId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -39,6 +42,18 @@ export default function InvoiceDetailPage() {
       setPayAmount(data.balance_due);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load invoice");
+    }
+  }, [id]);
+
+  const loadPoCandidates = useCallback(async () => {
+    try {
+      const data = await apiFetch<PoCandidatesResponse>(
+        `/api/v1/invoices/${id}/po-candidates`
+      );
+      setPoData(data);
+      setPoConfirmId(null);
+    } catch {
+      setPoData(null);
     }
   }, [id]);
 
@@ -111,6 +126,35 @@ export default function InvoiceDetailPage() {
   useEffect(() => {
     void loadAssist();
   }, [loadAssist]);
+
+  useEffect(() => {
+    void loadPoCandidates();
+  }, [loadPoCandidates]);
+
+  async function confirmPoMatch(poId: string) {
+    if (poConfirmId !== poId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await apiFetch<InvoiceDetail>(
+        `/api/v1/invoices/${id}/po-match`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            purchase_order_reference_id: poId,
+            confirmed: true,
+          }),
+        }
+      );
+      setInv(data);
+      setPoConfirmId(null);
+      await loadPoCandidates();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "PO match confirm failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function workflow(action: "submit_review" | "submit_approval") {
     setBusy(true);
@@ -342,6 +386,69 @@ export default function InvoiceDetailPage() {
                 </ul>
               </section>
             )}
+
+            <section className="space-y-3 rounded-lg border border-slate/15 bg-white/80 p-4">
+              <h2 className="font-medium text-ink">PO match</h2>
+              <p className="text-xs text-slate">
+                Candidates with differences only — never auto-linked. Reviewer
+                or admin must confirm.
+              </p>
+              <p className="text-sm text-slate">
+                Invoice PO ref: {inv.po_reference || "—"}
+                {inv.matched_po_number
+                  ? ` · Matched: ${inv.matched_po_number}`
+                  : " · Not confirmed"}
+              </p>
+              {poData && poData.candidates.length === 0 && (
+                <p className="text-sm text-slate">No PO candidates ranked.</p>
+              )}
+              {poData?.candidates.map((c) => (
+                <div
+                  key={c.id}
+                  className="rounded-md border border-slate/10 bg-mist/30 px-3 py-2 text-sm"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium text-ink">
+                      {c.po_number}{" "}
+                      <span className="text-xs font-normal text-slate">
+                        score {c.score}
+                      </span>
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-1 text-xs text-ink">
+                        <input
+                          type="checkbox"
+                          checked={poConfirmId === c.id}
+                          onChange={(e) =>
+                            setPoConfirmId(e.target.checked ? c.id : null)
+                          }
+                        />
+                        Confirm
+                      </label>
+                      <button
+                        type="button"
+                        disabled={busy || poConfirmId !== c.id}
+                        onClick={() => void confirmPoMatch(c.id)}
+                        className="rounded-md bg-accent px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                      >
+                        Link PO
+                      </button>
+                    </div>
+                  </div>
+                  {c.differences && c.differences.length > 0 && (
+                    <ul className="mt-2 space-y-1 text-xs text-slate">
+                      {c.differences.map((d) => (
+                        <li key={d.field}>
+                          {d.field}: invoice {d.invoice_value ?? "—"} vs PO{" "}
+                          {d.po_value ?? "—"}{" "}
+                          {d.match ? "(match)" : "(mismatch)"}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </section>
 
             <section className="grid gap-4 rounded-lg border border-slate/15 bg-white/80 p-4 sm:grid-cols-3">
               <div>

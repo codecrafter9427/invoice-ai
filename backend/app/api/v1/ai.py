@@ -9,13 +9,15 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.ai import get_ai_provider
 from app.api.deps import CurrentUser, DbSession
+from app.core.config import get_settings
 from app.core.errors import ApiError
+from app.core.rate_limit import check_rate_limit
 from app.models import Invoice, Supplier
 from app.schemas.common import AIRequest, AIResponse
 from app.services.anomaly_radar import load_and_evaluate
@@ -26,13 +28,25 @@ from app.services.po_match import find_po_candidates
 router = APIRouter()
 
 
+def _ai_rate_limit(request: Request, user: CurrentUser) -> None:
+    settings = get_settings()
+    check_rate_limit(
+        f"ai:{user.id}:{request.url.path}",
+        limit=settings.ai_rate_limit,
+        window_seconds=settings.ai_rate_window_seconds,
+        message="Too many AI requests — try again shortly",
+    )
+
+
 @router.post("/invoice-extract", response_model=AIResponse)
 async def invoice_extract(
     body: AIRequest,
     user: CurrentUser,
     db: DbSession,
+    request: Request,
 ) -> AIResponse:
     """Extract header/lines from text/OCR text. OCR unverified until review."""
+    _ai_rate_limit(request, user)
     payload = dict(body.input)
 
     # Optional: explain known validation issue codes
@@ -95,8 +109,10 @@ async def invoice_anomalies(
     body: AIRequest,
     user: CurrentUser,
     db: DbSession,
+    request: Request,
 ) -> AIResponse:
     """Invoice Anomaly Radar — rules-first signals; never a fraud verdict."""
+    _ai_rate_limit(request, user)
     payload = dict(body.input)
     invoice_id_raw = payload.get("invoice_id") or (
         body.context_ids[0] if body.context_ids else None
@@ -154,8 +170,10 @@ async def category_suggestion(
     body: AIRequest,
     user: CurrentUser,
     db: DbSession,
+    request: Request,
 ) -> AIResponse:
     """Suggest accounting category; user must confirm."""
+    _ai_rate_limit(request, user)
     payload = dict(body.input)
     description = str(payload.get("description") or "")
     lines = payload.get("line_descriptions") or []

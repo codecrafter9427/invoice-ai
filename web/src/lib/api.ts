@@ -132,12 +132,44 @@ export type InvoiceDetail = {
   accounting_category_id?: string | null;
   accounting_category_code?: string | null;
   accounting_category_name?: string | null;
+  purchase_order_reference_id?: string | null;
+  matched_po_number?: string | null;
   has_duplicate_warning: boolean;
   has_anomaly_signal: boolean;
   anomaly_notes: string | null;
   lines: InvoiceLine[];
   validation_issues: string[];
   documents?: DocumentPreview[];
+};
+
+export type PoDifference = {
+  field: string;
+  invoice_value: string | null;
+  po_value: string | null;
+  match: boolean;
+};
+
+export type PoCandidate = {
+  id: string;
+  po_number: string;
+  supplier_id: string | null;
+  amount: string | null;
+  currency: string;
+  score: number;
+  reasons: string[];
+  match_type?: string;
+  note?: string;
+  differences?: PoDifference[];
+};
+
+export type PoCandidatesResponse = {
+  invoice_id: string;
+  po_reference: string | null;
+  purchase_order_reference_id: string | null;
+  matched_po_number: string | null;
+  candidates: PoCandidate[];
+  auto_match: boolean;
+  note?: string;
 };
 
 export type AgingBucket = {

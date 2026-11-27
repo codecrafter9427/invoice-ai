@@ -12,6 +12,7 @@ from app.core.errors import ApiError
 from app.services.reports import (
     aging_report,
     aging_to_csv,
+    payables_summary,
     supplier_spend_report,
     supplier_spend_to_csv,
 )
@@ -30,8 +31,11 @@ def payables_overview(
     spend = supplier_spend_report(
         db, organization_id=user.organization_id, as_of=as_of
     )
+    summary = payables_summary(db, organization_id=user.organization_id, as_of=as_of)
     return {
         "as_of": aging["as_of"],
+        "outstanding_balance": summary["outstanding_balance"],
+        "paid_this_month": summary["paid_this_month"],
         "aging": {
             "total_balance_due": aging["total_balance_due"],
             "invoice_count": aging["invoice_count"],

@@ -5,7 +5,9 @@ from fastapi import APIRouter
 from app.api.v1 import (
     ai,
     approvals,
+    audit,
     auth,
+    connectors,
     documents,
     invoices,
     payments,
@@ -30,3 +32,9 @@ api_router.include_router(approvals.router, prefix="/approvals", tags=["approval
 api_router.include_router(payments.router, prefix="/payments", tags=["payments"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reports"])
 api_router.include_router(ai.router, prefix="/ai", tags=["ai"])
+api_router.include_router(audit.router, prefix="/audit-events", tags=["audit"])
+api_router.include_router(
+    connectors.router,
+    prefix="/connectors/insights/v1",
+    tags=["insights-connector"],
+)

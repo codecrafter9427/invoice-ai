@@ -23,7 +23,8 @@ def test_health_m4(client):
     assert res.status_code == 200
     body = res.json()
     assert body["status"] == "ok"
-    assert body["version"] == "0.4.0-m4"
+    # M6 bumped health version; keep assertion current
+    assert body["version"] == "0.6.0-m6"
 
 
 def test_reports_require_auth(client):

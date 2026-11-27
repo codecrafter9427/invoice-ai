@@ -1,6 +1,6 @@
 # Invoice AI — MVP Specification
 
-Portfolio MVP for Product 4 (Invoice AI). **Milestone 5** wires Flutter camera/gallery → free on-device ML Kit OCR → review → draft save (paste fallback kept). **Milestone 4** delivered polish: aging/supplier-spend reports + CSV, category confirm PATCH, document preview metadata, web UX polish, Flutter capture/list against API, DEMO.md, and expanded tests.
+Portfolio MVP for Product 4 (Invoice AI). **Milestone 6** delivers the standalone invoice-reviews queue, human-confirmed PO matching, Insights connector, and production-readiness hardening. **Milestone 5** wired Flutter camera/gallery → free on-device ML Kit OCR → review → draft save (paste fallback kept). **Milestone 4** delivered polish: aging/supplier-spend reports + CSV, category confirm PATCH, document preview metadata, web UX polish, Flutter capture/list against API, DEMO.md, and expanded tests.
 
 ## Purpose
 
@@ -27,10 +27,10 @@ Every business record is organization-scoped. Endpoints enforce tenant authoriza
 | Invoice | Header + workflow status — **CRUD + workflow** |
 | InvoiceLine | Nested on invoice create/update; deterministic line totals |
 | InvoiceDocument | Metadata + OCR text preview fields (**M4** tightened) |
-| InvoiceReview | Validation notes / flags (seed; full UX later) |
+| InvoiceReview | Validation notes / flags — **M6** queue + CRUD API + Reviews UI |
 | ApprovalStep | Approve/reject with comments |
 | Payment | Date, amount, method/reference; updates balance |
-| PurchaseOrderReference | Candidate PO match only |
+| PurchaseOrderReference | Candidate PO match; **M6** human confirm sets invoice FK |
 | AccountingCategory | Suggested category; user confirms via **PATCH** (**M4**) |
 | AuditEvent | Seed + create/update/approve/pay/document/category mutations |
 
@@ -50,15 +50,19 @@ Workflow actions: `submit_review`, `submit_approval`, approve/reject, record pay
 | `/invoices/{id}/category` | **M4** PATCH confirm category |
 | `/invoice-lines` | Nested via invoices; standalone stub |
 | `/documents` | Metadata register/list/get + preview fields |
-| `/invoice-reviews` | Coming Soon stub |
+| `/invoice-reviews` | **M6** queue + list/create/resolve |
+| `/invoices/{id}/po-candidates` | **M6** candidates + differences |
+| `/invoices/{id}/po-match` | **M6** human confirm (`confirmed:true`) |
 | `/approvals` | POST decide (role-checked) + pending list |
 | `/payments` | POST record updates `amount_paid` / `balance_due` / status |
-| `/reports/payables` | **M4** overview + `/aging` + `/supplier-spend` + `/export.csv` |
+| `/reports/payables` | **M4** overview + `/aging` + `/supplier-spend` + `/export.csv` (+ paid_this_month) |
+| `/audit-events` | **M6** admin org-scoped list |
+| `/connectors/insights/v1/*` | **M6** read-only Insights export |
 | `/ai/invoice-extract` | Text→JSON + confidence; OCR unverified until review |
 | `/ai/invoice-anomalies` | Anomaly Radar (rules-first; never fraud) |
 | `/ai/category-suggestion` | Suggestion; `requires_confirmation=true` |
 
-Health (outside prefix): `GET /health` → version `0.4.0-m4`
+Health (outside prefix): `GET /health` → version `0.6.0-m6`
 
 Shared conventions: REST JSON, UUID PKs, UTC timestamps, decimal monetary values, error shape `{error:{code,message,details}}`.
 
@@ -117,11 +121,19 @@ See prior README / chat history for scope.
 - OCR unit tests with fakes; widget tests updated
 - No DB migration; reuses `POST /ai/invoice-extract` and `POST /invoices`
 
-### Remaining gaps (post-M5)
+### M6 — Reviews, PO confirm, Insights, hardening — **Done**
 
-- Flutter offline draft queue (explicitly out of M5)
+- Standalone `/invoice-reviews` queue + web Reviews page
+- PO candidates + differences; `POST …/po-match` with `confirmed:true` sets `purchase_order_reference_id` (never auto-match)
+- Approvals/payments remain role-protected; audit `review_*` + `po_match_confirm`
+- Insights connector under `/connectors/insights/v1` (JWT or `INSIGHTS_CONNECTOR_TOKEN`)
+- Rate limit auth/AI; login `expires_in` + `POST /auth/refresh`; prod secret guards; `docs/BACKUP.md`; CI; env demo vs prod; version `0.6.0-m6`
+
+### Remaining gaps (post-M6)
+
+- Flutter offline draft queue
 - Full mobile approve/pay UX
-- Standalone `/invoice-lines` and `/invoice-reviews` beyond stubs
+- Standalone `/invoice-lines` beyond stub
 - Production auth / hosted OCR (out of portfolio free-only policy)
 
 ## Anomaly Radar rules

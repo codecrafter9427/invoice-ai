@@ -107,6 +107,8 @@ class InvoiceOut(BaseModel):
     accounting_category_id: UUID | None = None
     accounting_category_code: str | None = None
     accounting_category_name: str | None = None
+    purchase_order_reference_id: UUID | None = None
+    matched_po_number: str | None = None
     has_duplicate_warning: bool
     has_anomaly_signal: bool
     anomaly_notes: str | None

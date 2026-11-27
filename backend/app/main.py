@@ -6,20 +6,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
-from app.core.config import get_settings
+from app.core.config import get_settings, validate_production_secrets
 from app.core.errors import ApiError, error_body
 from app.schemas.common import HealthResponse
 
 settings = get_settings()
+validate_production_secrets(settings)
+
+APP_VERSION = settings.app_version
 
 app = FastAPI(
     title=settings.app_name,
-    version="0.4.0-m4",
+    version=APP_VERSION,
     description=(
         "Supplier invoice capture, review, approval, and payables visibility. "
-        "Milestone 4: aging/supplier-spend reports + CSV, category confirm PATCH, "
-        "document preview metadata, web/Flutter polish. "
-        "Totals remain deterministic code. No paid OCR/LLM required."
+        "Milestone 6: invoice-reviews queue, human-confirmed PO match, "
+        "Insights connector, auth/AI rate limits, backup/CI hardening. "
+        "Totals remain deterministic code. DemoAI default. No paid OCR/LLM."
     ),
 )
 
@@ -58,4 +61,4 @@ async def validation_error_handler(
 
 @app.get("/health", response_model=HealthResponse, tags=["health"])
 async def health() -> HealthResponse:
-    return HealthResponse()
+    return HealthResponse(version=APP_VERSION)

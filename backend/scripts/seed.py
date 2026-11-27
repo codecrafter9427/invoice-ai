@@ -276,8 +276,9 @@ def seed() -> None:
                     "anomaly": False,
                     "notes": None,
                     "cat_idx": i % 4,
+                    # M6: some invoices carry PO text without confirmed FK (candidates only)
                     "po": po_refs[i % 3].po_number if i % 4 == 0 else None,
-                    "po_id": po_refs[i % 3].id if i % 4 == 0 else None,
+                    "po_id": po_refs[i % 3].id if i % 8 == 0 else None,
                 }
             )
 
@@ -359,6 +360,7 @@ def seed() -> None:
         )
 
         # Anomaly: changed payment details signal (noted; rules in M3)
+        # Also carries a PO number that amount-mismatches seeded PO-2026-0200 (M6 diffs)
         blueprints.append(
             {
                 "supplier_idx": 2,
@@ -372,7 +374,7 @@ def seed() -> None:
                 "anomaly": True,
                 "notes": "Supplier remittance account differs from directory payment_details",
                 "cat_idx": 0,
-                "po": None,
+                "po": "PO-2026-0200",
                 "po_id": None,
             }
         )

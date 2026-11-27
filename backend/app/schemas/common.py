@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class HealthResponse(BaseModel):
     status: str = "ok"
     service: str = "invoice-ai"
-    version: str = "0.4.0-m4"
+    version: str = "0.6.0-m6"
 
 
 class ComingSoonResponse(BaseModel):
@@ -26,6 +26,9 @@ class DemoLoginRequest(BaseModel):
 class DemoLoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    expires_in: int = Field(
+        default=3600, description="Access token lifetime in seconds"
+    )
     email: str
     role: str
     organization_id: UUID

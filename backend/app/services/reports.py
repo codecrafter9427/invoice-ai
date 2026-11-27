@@ -12,7 +12,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Invoice, InvoiceStatus
+from app.models import Invoice, InvoiceStatus, Payment
 from app.services.totals import money
 
 OPEN_STATUSES = {
@@ -220,6 +220,57 @@ def aging_to_csv(report: dict[str, Any]) -> str:
             ]
         )
     return buf.getvalue()
+
+
+def paid_this_month(
+    db: Session,
+    *,
+    organization_id: UUID,
+    as_of: date | None = None,
+) -> dict[str, Any]:
+    """Sum Payment.amount for the calendar month ending at as_of (deterministic)."""
+    as_of_date = _as_of(as_of)
+    month_start = as_of_date.replace(day=1)
+    rows = list(
+        db.scalars(
+            select(Payment).where(
+                Payment.organization_id == organization_id,
+                Payment.payment_date >= month_start,
+                Payment.payment_date <= as_of_date,
+            )
+        ).all()
+    )
+    total_paid = money(sum((p.amount for p in rows), Decimal("0")))
+    return {
+        "year_month": f"{as_of_date.year:04d}-{as_of_date.month:02d}",
+        "amount_paid": str(total_paid),
+        "payment_count": len(rows),
+    }
+
+
+def payables_summary(
+    db: Session,
+    *,
+    organization_id: UUID,
+    as_of: date | None = None,
+) -> dict[str, Any]:
+    """Outstanding + paid-this-month + aging totals for Insights connector."""
+    as_of_date = _as_of(as_of)
+    aging = aging_report(db, organization_id=organization_id, as_of=as_of_date)
+    paid = paid_this_month(db, organization_id=organization_id, as_of=as_of_date)
+    aging_totals = {b["bucket"]: b["balance_due"] for b in aging["buckets"]}
+    return {
+        "as_of": as_of_date.isoformat(),
+        "currency": aging.get("currency", "USD"),
+        "outstanding_balance": aging["total_balance_due"],
+        "open_invoice_count": aging["invoice_count"],
+        "paid_this_month": paid,
+        "aging_totals": aging_totals,
+        "source": {
+            "product": "invoice-ai",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+        },
+    }
 
 
 def supplier_spend_to_csv(report: dict[str, Any]) -> str:

@@ -16,6 +16,7 @@ from app.models import (
     Invoice,
     InvoiceLine,
     InvoiceStatus,
+    PurchaseOrderReference,
     Supplier,
     User,
     UserRole,
@@ -32,8 +33,10 @@ from app.schemas.invoices import (
     InvoiceUpdate,
     InvoiceWorkflowAction,
 )
+from app.schemas.po_match import PoMatchConfirm
 from app.services.audit import record_audit
 from app.services.invoices import find_duplicate_invoices, validate_invoice_dates
+from app.services.po_match import candidates_for_invoice, confirm_po_match
 from app.services.totals import compute_invoice_totals, money, validate_header_totals
 from fastapi.responses import JSONResponse
 
@@ -97,8 +100,13 @@ def _invoice_out(
             seen.add(i)
             unique_issues.append(i)
     code, name = (None, None)
+    matched_po_number = None
     if db is not None:
         code, name = _category_labels(db, inv)
+        if inv.purchase_order_reference_id:
+            po = db.get(PurchaseOrderReference, inv.purchase_order_reference_id)
+            if po is not None and po.organization_id == inv.organization_id:
+                matched_po_number = po.po_number
     return InvoiceOut(
         id=inv.id,
         organization_id=inv.organization_id,
@@ -118,6 +126,8 @@ def _invoice_out(
         accounting_category_id=inv.accounting_category_id,
         accounting_category_code=code,
         accounting_category_name=name,
+        purchase_order_reference_id=inv.purchase_order_reference_id,
+        matched_po_number=matched_po_number,
         has_duplicate_warning=inv.has_duplicate_warning,
         has_anomaly_signal=inv.has_anomaly_signal,
         anomaly_notes=inv.anomaly_notes,
@@ -416,6 +426,60 @@ def get_invoice(
     user: CurrentUser,
     db: DbSession,
 ) -> InvoiceOut:
+    inv = _get_org_invoice(db, user, invoice_id, with_documents=True)
+    return _invoice_out(inv, db=db)
+
+
+@router.get("/{invoice_id}/po-candidates")
+def get_po_candidates(
+    invoice_id: UUID,
+    user: CurrentUser,
+    db: DbSession,
+) -> dict:
+    """Ranked PO candidates with field differences — never auto-linked."""
+    inv = _get_org_invoice(db, user, invoice_id, with_lines=True)
+    candidates = candidates_for_invoice(db, inv)
+    matched_po_number = None
+    if inv.purchase_order_reference_id:
+        po = db.get(PurchaseOrderReference, inv.purchase_order_reference_id)
+        if po is not None and po.organization_id == inv.organization_id:
+            matched_po_number = po.po_number
+    return {
+        "invoice_id": str(inv.id),
+        "po_reference": inv.po_reference,
+        "purchase_order_reference_id": (
+            str(inv.purchase_order_reference_id)
+            if inv.purchase_order_reference_id
+            else None
+        ),
+        "matched_po_number": matched_po_number,
+        "candidates": candidates,
+        "auto_match": False,
+        "note": "Candidates only — confirm via POST /po-match with confirmed=true.",
+    }
+
+
+@router.post(
+    "/{invoice_id}/po-match",
+    response_model=InvoiceOut,
+    dependencies=[Depends(require_roles(UserRole.ADMIN, UserRole.REVIEWER))],
+)
+def post_po_match(
+    invoice_id: UUID,
+    body: PoMatchConfirm,
+    user: CurrentUser,
+    db: DbSession,
+) -> InvoiceOut:
+    """Human-confirm a PO match (sets purchase_order_reference_id)."""
+    inv = _get_org_invoice(db, user, invoice_id, with_documents=True)
+    confirm_po_match(
+        db,
+        user=user,
+        inv=inv,
+        purchase_order_reference_id=body.purchase_order_reference_id,
+        confirmed=body.confirmed,
+    )
+    db.commit()
     inv = _get_org_invoice(db, user, invoice_id, with_documents=True)
     return _invoice_out(inv, db=db)
 

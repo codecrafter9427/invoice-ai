@@ -2,17 +2,20 @@
 
 Supplier invoice capture, extraction review, approval, payment tracking, and payable visibility for small businesses.
 
-**Milestone 5 (mobile OCR):** Flutter camera/gallery → free on-device ML Kit text recognition → review → save draft. Paste fallback kept. No paid OCR, no offline queue, no auto-approve.
+**Milestone 6:** Standalone invoice-reviews queue + web Reviews page; human-confirmed PO match (candidates + differences); Insights connector; auth/AI rate limits; JWT `expires_in` + refresh; prod secret guards; backup docs + CI. DemoAI default. Deterministic totals. No paid OCR.
 
-**Milestone 4 complete:** aging + supplier-spend reports with CSV export, category suggestion confirm via PATCH, tightened document preview metadata, web UX polish, Flutter capture/list against API, expanded tests, and a scripted [DEMO.md](./DEMO.md).
+**Milestone 5:** Flutter camera/gallery → free on-device ML Kit OCR → review → draft. Paste fallback kept.
+
+**Milestone 4:** Aging + supplier-spend reports with CSV, category confirm PATCH, document preview, web/Flutter polish, DEMO.md.
 
 ## Purpose
 
 - Capture supplier invoices (manual entry + text/OCR extract assist) and review fields
 - Validate totals, duplicates, and dates with deterministic calculations
 - Route invoices through review → approval → payment tracking
+- Human-confirm PO matches (never auto-link)
 - Surface **Invoice Anomaly Radar**: transparent review signals — never fraud verdicts
-- Aging and supplier-spend reports with CSV export
+- Expose read-only payables metrics to Business Insights
 - Demo locally with free tooling only (no paid APIs or OCR services)
 
 ## Stack
@@ -24,24 +27,22 @@ Supplier invoice capture, extraction review, approval, payment tracking, and pay
 | Database | PostgreSQL (UUID PKs, `Numeric` monetary decimals) |
 | Mobile | Flutter (login / list / capture with free ML Kit OCR + paste) |
 | AI | `AIProvider` + `DemoAIProvider` (default); optional Ollama adapter |
-| Auth | Demo JWT login, org-scoped authorization |
+| Auth | Demo JWT login, org-scoped authorization, optional refresh |
 
 ## Project layout
 
 ```
 products/invoice-ai/
   README.md
-  DEMO.md                     # Scripted M4/M5 checklist
+  DEMO.md
   MVP_SPEC.md
+  docs/BACKUP.md
+  docs/CONNECTORS.md
   .env.example
   docker-compose.yml          # Postgres on host port 5436
   backend/
-    app/                      # FastAPI app, services, APIs, ai/
-    alembic/                  # Migrations
-    scripts/seed.py           # Demo seed
-    tests/                    # Health, auth/tenant, M2–M4 tests
-  web/                        # Next.js payables UI
-  mobile/                     # Flutter app (see mobile/README.md)
+  web/
+  mobile/
 ```
 
 ## Prerequisites
@@ -67,7 +68,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-PostgreSQL listens on **host port `5436`** (container `5432`).
+PostgreSQL listens on **host port `5436`** (container `5432`). Backup notes: [docs/BACKUP.md](./docs/BACKUP.md).
 
 ### 3. Backend
 
@@ -86,9 +87,10 @@ python -m scripts.seed
 uvicorn app.main:app --reload --port 8004
 ```
 
-- Health: `GET http://localhost:8004/health` → `0.4.0-m4`
+- Health: `GET http://localhost:8004/health` → `0.6.0-m6`
 - API prefix: `/api/v1`
 - OpenAPI: `http://localhost:8004/docs`
+- Insights connector: [docs/CONNECTORS.md](./docs/CONNECTORS.md)
 
 ### 4. Web
 
@@ -108,8 +110,6 @@ flutter pub get
 flutter run
 ```
 
-Documented Flutter SDK install and device base URLs: [mobile/README.md](./mobile/README.md).
-
 ## Demo credentials
 
 Password for all accounts: **`demo`**
@@ -121,8 +121,6 @@ Password for all accounts: **`demo`**
 | `approver@invoiceai.local` | Approver |
 | `staff@invoiceai.local` | Staff |
 | `other@otherco.local` | Admin of isolation org (tenant tests) |
-
-Seed includes: **10 suppliers**, **25 invoices** with line items, duplicate + anomaly flag examples, sample OCR text on a few documents, and unpaid / partial / paid states (fictional data only).
 
 ## Tests & quality gates
 
@@ -137,43 +135,29 @@ npm run lint
 npm run typecheck
 ```
 
-Covers `/health`, demo login, tenant isolation, deterministic totals, duplicate flags, role-checked approvals, payments, demo extract, Anomaly Radar (never fraud), **category confirm PATCH**, **aging/spend reports + CSV**, document preview metadata, and AI auth.
+CI workflow: `.github/workflows/ci.yml` (pytest + web lint/typecheck).
 
 ## AI setup (no Ollama required)
 
-Default is fully local and offline:
+Default is fully local and offline (`AI_PROVIDER=demo`). Optional Ollama enriches explanations only; totals stay deterministic.
 
-1. Keep `AI_PROVIDER=demo` in `.env` (this is the default).
-2. Start the API — extract, category suggestion, and Anomaly Radar work with deterministic heuristics/rules.
-3. No network calls, no paid LLM, no paid OCR.
+## Demo steps (M6)
 
-Optional local Ollama (not needed for demos or tests):
+1. Boot DB + seed + API (`0.6.0-m6`) + web
+2. **Reviews** page → needs-review queue → add note → submit for approval
+3. Invoice detail → **PO match** candidates/differences → confirm checkbox → link
+4. Approver: approve → pay (staff remains forbidden)
+5. Reports + Insights: `GET /api/v1/connectors/insights/v1/payables/summary`
 
-1. Install [Ollama](https://ollama.com) and pull a free open model (e.g. `llama3.2`).
-2. Set `AI_PROVIDER=ollama`, `OLLAMA_BASE_URL=http://localhost:11434`, `OLLAMA_MODEL=llama3.2`.
-3. If Ollama is down, the adapter falls back to `DemoAIProvider`.
-4. Structured extract + anomaly **rules** stay deterministic; Ollama may only enrich explanations. Totals are never computed by AI.
-
-## Demo steps (M4)
-
-Full scripted checklist: **[DEMO.md](./DEMO.md)**
-
-Short path:
-
-1. Boot DB + seed + API (`0.4.0-m4`) + web
-2. Staff: create invoice → review → Approver: approve → partial pay
-3. Extract assist + Anomaly Radar (signals labeled not fraud)
-4. Confirm category on invoice detail (PATCH persist)
-5. Reports → aging + supplier spend → CSV export
-6. Optional Flutter: login → list → capture draft
+Full earlier checklist: **[DEMO.md](./DEMO.md)**
 
 ## Architecture notes
 
 - Organization-scoped JWT; every list/get/mutation filters by `org_id`
-- Monetary math and aging buckets are **deterministic code** (`app.services.totals`, `app.services.reports`)
-- AI endpoints return `{result, explanation, sources, requires_confirmation}` — category/extract require human confirm
-- Document endpoints register **metadata + optional pasted OCR text** only (no SaaS OCR upload)
-- Reports: `GET /api/v1/reports/payables/aging`, `/supplier-spend`, `/export.csv?report=aging|supplier_spend`
+- Monetary math and aging buckets are **deterministic code**
+- PO matches require `confirmed:true` — extract never sets `purchase_order_reference_id`
+- Auth/AI endpoints are rate-limited in-memory; login returns `expires_in`; `POST /auth/refresh` slides the session
+- `APP_ENV=production` refuses weak `SECRET_KEY` and `DEBUG=true`
 
 ## Milestones
 
@@ -183,16 +167,17 @@ Short path:
 | **M2** | Supplier/invoice CRUD, totals/duplicates/dates, workflow, approvals + audit, payments + balance, web UI, API tests | **Done** |
 | **M3** | AIProvider extract/category/anomaly explain; Invoice Anomaly Radar UI; document metadata upload | **Done** |
 | **M4** | Reports + CSV, category confirm PATCH, document preview, web/Flutter polish, DEMO.md, expanded tests | **Done** |
-| **M5** | Flutter camera/gallery + free ML Kit OCR → review → draft (`submit_for_review: false`); paste fallback; no offline queue | **Done** |
+| **M5** | Flutter camera/gallery + free ML Kit OCR → review → draft; paste fallback | **Done** |
+| **M6** | Reviews queue, PO confirm, Insights connector, hardening, CI/backup | **Done** |
 
 ## Known limitations
 
-- Prototype JWT auth only — not production security
-- Extract is heuristic over pasted/OCR text (no SaaS OCR); user must review
-- Anomaly Radar never auto-blocks payment; signals are advisory
-- Category suggestion is not accounting/tax advice; confirm before save
-- Standalone `/invoice-lines` remains a stub (lines nest under invoices)
-- Flutter offline draft queue remains out of scope (M5 ships on-device OCR only)
-- Mobile approvals/payments UX remain web-primary for the demo
+- Prototype JWT auth only — refresh is sliding access, not a stored refresh-token store
+- In-memory rate limits reset per process
+- Extract is heuristic over pasted/OCR text; user must review
+- Anomaly Radar never auto-blocks payment
+- Standalone `/invoice-lines` remains a stub
+- Flutter offline draft queue remains out of scope
+- Local `PurchaseOrderReference` table is not Inventory AI POs
 
 See [MVP_SPEC.md](./MVP_SPEC.md) for entities, API groups, and acceptance criteria.

@@ -46,20 +46,22 @@ def create_access_token(
     email: str,
     role: str,
     expires_minutes: int | None = None,
-) -> str:
+) -> tuple[str, int]:
+    """Return (token, expires_in_seconds)."""
     settings = get_settings()
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=expires_minutes or settings.access_token_expire_minutes
-    )
+    minutes = expires_minutes or settings.access_token_expire_minutes
+    expire = datetime.now(timezone.utc) + timedelta(minutes=minutes)
     payload: dict[str, Any] = {
         "sub": str(user_id),
         "org_id": str(organization_id),
         "email": email,
         "role": role,
+        "typ": "access",
         "exp": expire,
         "iat": datetime.now(timezone.utc),
     }
-    return jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
+    token = jwt.encode(payload, settings.secret_key, algorithm=ALGORITHM)
+    return token, int(minutes * 60)
 
 
 def decode_access_token(token: str) -> dict[str, Any]:
